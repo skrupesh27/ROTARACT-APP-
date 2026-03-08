@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+{% block title %}{{ event.title }} — Event Detail{% endblock %}
+{% block page_title %}Event Detail{% endblock %}
+
+{% block head %}
+<style>
+  .back-link { display: inline-flex; align-items: center; gap: 0.4rem; color: var(--muted); font-size: 0.85rem; text-decoration: none; margin-bottom: 1.25rem; transition: color 0.15s; }
+  .back-link:hover { color: var(--text); }
+
+  .event-hero {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.5rem; margin-bottom: 1.5rem;
+    display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 1.5rem;
+  }
+  .event-type-chip {
+    display: inline-flex; align-items: center; padding: 0.25rem 0.65rem;
+    border-radius: 6px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.06em; margin-bottom: 0.5rem;
+  }
+  .event-hero h1 { font-size: 1.4rem; font-weight: 800; margin-bottom: 0.4rem; }
+  .event-meta-row { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
+  .event-meta-item { display: flex; align-items: center; gap: 0.35rem; font-size: 0.82rem; color: var(--muted); }
+  .stat-chips { display: flex; gap: 0.75rem; flex-direction: column; align-items: flex-end; }
+  .stat-chip { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem 1rem; text-align: center; min-width: 110px; }
+  .stat-chip .sv { font-size: 1.5rem; font-weight: 800; line-height: 1; }
+  .stat-chip .sl { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.2rem; }
+
+  .main-grid { display: grid; grid-template-columns: 1fr 320px; gap: 1.25rem; }
+
+  /* Bulk attendance */
+  .attendance-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .attendance-header { padding: 1.1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .attendance-header h2 { font-size: 0.95rem; font-weight: 700; }
+  .controls { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+
+  .search-members { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.75rem; color: var(--text); font-size: 0.82rem; font-family: 'Inter', sans-serif; outline: none; width: 200px; }
+  .search-members:focus { border-color: var(--blue); }
+
+  .member-roster { padding: 0.75rem; }
+  .roster-row {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.65rem 0.75rem; border-radius: 8px; cursor: pointer;
+    transition: background 0.12s; margin-bottom: 0.15rem;
+    border: 1px solid transparent;
+  }
+  .roster-row:hover { background: rgba(255,255,255,0.03); }
+  .roster-row.present { background: rgba(16,185,129,0.06); border-color: rgba(16,185,129,0.2); }
+  .roster-row.absent-req { background: rgba(247,168,27,0.05); border-color: rgba(247,168,27,0.15); }
+  .roster-cb { width: auto !important; accent-color: var(--blue); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+  .roster-av { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; overflow: hidden; }
+  .roster-av img { width: 100%; height: 100%; object-fit: cover; }
+  .roster-info { flex: 1; min-width: 0; }
+  .roster-name { font-size: 0.875rem; font-weight: 500; }
+  .roster-pos { font-size: 0.7rem; color: var(--muted); }
+  .roster-badge { padding: 0.15rem 0.5rem; border-radius: 5px; font-size: 0.65rem; font-weight: 600; flex-shrink: 0; }
+  .badge-present { background: rgba(16,185,129,0.15); color: #34d399; }
+  .badge-absent { background: rgba(247,168,27,0.15); color: var(--gold); }
+
+  .attendance-footer { padding: 1rem 1.25rem; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 1rem; background: rgba(255,255,255,0.01); }
+  .count-label { font-size: 0.85rem; color: var(--muted); }
+  .count-label span { font-weight: 700; color: var(--text); }
+
+  /* Absence requests panel */
+  .side-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 1rem; }
+  .side-panel-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); font-size: 0.85rem; font-weight: 700; }
+  .side-panel-body { padding: 0.75rem 1.25rem; }
+
+  .absence-row { padding: 0.65rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .absence-row:last-child { border-bottom: none; }
+  .ab-member { font-size: 0.85rem; font-weight: 500; margin-bottom: 0.2rem; }
+  .ab-reason { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.4rem; }
+  .ab-status { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 5px; font-size: 0.65rem; font-weight: 700; }
+  .ab-pending { background: rgba(247,168,27,0.15); color: var(--gold); }
+  .ab-approved { background: rgba(16,185,129,0.15); color: #34d399; }
+  .ab-rejected { background: rgba(239,68,68,0.15); color: #f87171; }
+
+  .progress-bar { height: 6px; background: rgba(255,255,255,0.06); border-radius: 99px; overflow: hidden; margin-top: 0.75rem; }
+  .progress-fill { height: 100%; border-radius: 99px; background: var(--blue); transition: width 0.5s; }
+
+  .no-absence { color: var(--muted); font-size: 0.82rem; padding: 0.5rem 0; }
+
+  @media (max-width: 900px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .event-hero { grid-template-columns: 1fr; }
+    .stat-chips { flex-direction: row; align-items: flex-start; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<a href="/admin/events" class="back-link">← Back to Events</a>
+
+<!-- Event Hero -->
+<div class="event-hero">
+  <div>
+    <div class="event-type-chip" style="background: {{ event.type_color }}22; color: {{ event.type_color }};">
+      {{ event.event_type | capitalize }}
+    </div>
+    <h1>{{ event.title }}</h1>
+    {% if event.description %}
+    <p style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem;">{{ event.description }}</p>
+    {% endif %}
+    <div class="event-meta-row">
+      <div class="event-meta-item">🕐 {{ event.date.strftime('%A, %d %B %Y — %I:%M %p') }}</div>
+      {% if event.end_date %}<div class="event-meta-item">→ {{ event.end_date.strftime('%I:%M %p') }}</div>{% endif %}
+      {% if event.location %}<div class="event-meta-item">📍 {{ event.location }}</div>{% endif %}
+      {% if event.google_calendar_id %}<div class="event-meta-item" style="color:var(--success);">🗓 Synced to Google Calendar</div>{% endif %}
+    </div>
+    {% if not attendance_metric %}
+    <div style="margin-top:0.75rem;padding:0.65rem 0.85rem;background:rgba(247,168,27,0.08);border:1px solid rgba(247,168,27,0.2);border-radius:8px;font-size:0.78rem;color:var(--gold);">
+      ⚠️ No "Event Attendance" metric found. Create it in Metrics & KPIs to auto-award points.
+    </div>
+    {% endif %}
+  </div>
+  <div class="stat-chips">
+    <div class="stat-chip">
+      <div class="sv" style="color:var(--success);">{{ attended_ids | length }}</div>
+      <div class="sl">Present</div>
+    </div>
+    <div class="stat-chip">
+      <div class="sv" style="color:var(--gold);">+{{ event.points_for_attendance }}</div>
+      <div class="sl">Pts Each</div>
+    </div>
+    <div class="stat-chip">
+      <div class="sv" style="color:var(--danger);">{{ members | length - attended_ids | length }}</div>
+      <div class="sl">Absent</div>
+    </div>
+  </div>
+</div>
+
+<div class="main-grid">
+
+  <!-- Left: Bulk Attendance -->
+  <div>
+    <form method="POST" action="/admin/events/{{ event.id }}/bulk-attendance" id="attendanceForm">
+      <div class="attendance-panel">
+        <div class="attendance-header">
+          <h2>✅ Mark Attendance</h2>
+          <div class="controls">
+            <input type="text" class="search-members" id="searchMembers" placeholder="Search members..." oninput="filterRoster()" />
+            <button type="button" class="btn btn-ghost btn-sm" onclick="selectAll(true)">Select All</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="selectAll(false)">Deselect All</button>
+          </div>
+        </div>
+
+        <div class="member-roster" id="rosterList">
+          {% for m in members %}
+          {% set is_present = m.id in attended_ids %}
+          {% set has_absence = m.id in absence_member_ids %}
+          <label class="roster-row {% if is_present %}present{% elif has_absence %}absent-req{% endif %}" id="row-{{ m.id }}">
+            <input type="checkbox" name="member_ids" value="{{ m.id }}"
+                   class="roster-cb" {% if is_present %}checked{% endif %}
+                   onchange="updateCount()" />
+            <div class="roster-av" style="background: hsl({{ loop.index * 40 }}, 55%, 30%);">
+              {% if m.profile_picture %}
+                <img src="/static/uploads/avatars/{{ m.profile_picture }}" alt="{{ m.initials }}" />
+              {% else %}
+                {{ m.initials }}
+              {% endif %}
+            </div>
+            <div class="roster-info">
+              <div class="roster-name">
+                {{ m.name }}
+                {% if has_absence %}<span style="font-size:0.7rem;color:var(--gold);margin-left:0.4rem;">⚠ Absence requested</span>{% endif %}
+              </div>
+              <div class="roster-pos">{{ m.position }}</div>
+            </div>
+            {% if is_present %}
+              <span class="roster-badge badge-present">Present</span>
+            {% elif has_absence %}
+              <span class="roster-badge badge-absent">Excused?</span>
+            {% endif %}
+          </label>
+          {% endfor %}
+        </div>
+
+        <!-- Progress bar -->
+        {% set pct = ((attended_ids | length) / (members | length) * 100) | int if members | length > 0 else 0 %}
+        <div style="padding: 0 1.25rem;">
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: {{ pct }}%;"></div>
+          </div>
+        </div>
+
+        <div class="attendance-footer">
+          <div class="count-label">
+            <span id="selectedCount">{{ attended_ids | length }}</span> of {{ members | length }} members selected as present
+          </div>
+          <button type="submit" class="btn btn-primary">
+            💾 Save Attendance & Award Points
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Right: Absence Requests + Quick Stats -->
+  <div>
+
+    <div class="side-panel">
+      <div class="side-panel-header">
+        🙋 Absence Requests ({{ absence_requests | length }})
+      </div>
+      <div class="side-panel-body">
+        {% for req in absence_requests %}
+        <div class="absence-row">
+          <div class="ab-member">
+            {{ req.member.name }}
+            <span class="ab-status ab-{{ req.status }}">{{ req.status | capitalize }}</span>
+          </div>
+          <div class="ab-reason">"{{ req.reason }}"</div>
+          <div style="font-size:0.68rem;color:var(--muted);">
+            Submitted {{ req.created_at.strftime('%d %b %Y') }}
+          </div>
+          {% if req.admin_note %}
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:0.2rem;">Note: {{ req.admin_note }}</div>
+          {% endif %}
+        </div>
+        {% else %}
+        <p class="no-absence">No absence requests for this event.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Per-member points summary -->
+    <div class="side-panel">
+      <div class="side-panel-header">📊 Attendance Stats</div>
+      <div class="side-panel-body">
+        <div style="display:flex;flex-direction:column;gap:0.5rem;">
+          <div style="display:flex;justify-content:space-between;font-size:0.82rem;">
+            <span style="color:var(--muted);">Attendance rate</span>
+            <span style="font-weight:700;color:var(--blue);">
+              {{ pct }}%
+            </span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:0.82rem;">
+            <span style="color:var(--muted);">Points value</span>
+            <span style="font-weight:700;color:var(--gold);">+{{ event.points_for_attendance }} per member</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:0.82rem;">
+            <span style="color:var(--muted);">Total pts to distribute</span>
+            <span style="font-weight:700;color:var(--success);">
+              {{ attended_ids | length * event.points_for_attendance }}
+            </span>
+          </div>
+          {% if event.type_color %}
+          <div style="margin-top:0.5rem;padding-top:0.5rem;border-top:1px solid var(--border);">
+            <div class="progress-bar"><div class="progress-fill" style="width:{{ pct }}%;"></div></div>
+            <div style="font-size:0.7rem;color:var(--muted);margin-top:0.35rem;">{{ attended_ids | length }} present / {{ members | length - attended_ids | length }} absent</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick delete -->
+    <div class="side-panel">
+      <div class="side-panel-header" style="color:var(--danger);">⚠ Danger Zone</div>
+      <div class="side-panel-body">
+        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:0.75rem;">Permanently delete this event and all attendance records.</p>
+        <form method="POST" action="/admin/events/{{ event.id }}/delete" onsubmit="return confirm('Delete {{ event.title }}? This cannot be undone.')">
+          <button type="submit" class="btn btn-danger btn-sm" style="width:100%;">Delete Event</button>
+        </form>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const totalMembers = {{ members | length }};
+  const checkboxes = document.querySelectorAll('.roster-cb');
+
+  function updateCount() {
+    const checked = document.querySelectorAll('.roster-cb:checked').length;
+    document.getElementById('selectedCount').textContent = checked;
+    const pct = totalMembers > 0 ? (checked / totalMembers * 100) : 0;
+    document.getElementById('progressFill').style.width = pct + '%';
+
+    // Update row styling live
+    checkboxes.forEach(cb => {
+      const row = cb.closest('.roster-row');
+      if (cb.checked) {
+        row.classList.add('present');
+        row.classList.remove('absent-req');
+      } else {
+        row.classList.remove('present');
+      }
+    });
+  }
+
+  function selectAll(val) {
+    checkboxes.forEach(cb => { cb.checked = val; });
+    updateCount();
+  }
+
+  function filterRoster() {
+    const q = document.getElementById('searchMembers').value.toLowerCase();
+    document.querySelectorAll('.roster-row').forEach(row => {
+      const name = row.querySelector('.roster-name').textContent.toLowerCase();
+      row.style.display = name.includes(q) ? '' : 'none';
+    });
+  }
+</script>
+
+{% endblock %}

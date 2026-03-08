@@ -1,0 +1,12 @@
+venv/
+__pycache__/
+*.pyc
+*.db
+.env
+token.json
+credentials.json
+static/uploads/avatars/*.png
+static/uploads/avatars/*.jpg
+static/uploads/avatars/*.jpeg
+static/uploads/avatars/*.gif
+static/uploads/avatars/*.webp

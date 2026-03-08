@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Metrics & KPIs — Admin{% endblock %}
+{% block page_title %}Metrics & KPIs{% endblock %}
+
+{% block head %}
+<style>
+  .metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
+  .metric-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+  .metric-card:hover { border-color: rgba(255,255,255,0.15); }
+  .metric-card .mc-stripe { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; border-radius: 12px 0 0 12px; }
+  .metric-card .mc-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+  .metric-card .mc-name { font-size: 1rem; font-weight: 700; margin-bottom: 0.2rem; }
+  .metric-card .mc-desc { font-size: 0.78rem; color: var(--muted); margin-bottom: 0.75rem; min-height: 2em; }
+  .metric-card .mc-stats { display: flex; gap: 1rem; margin-bottom: 1rem; }
+  .metric-card .mc-stat { }
+  .metric-card .mc-stat .v { font-size: 1.1rem; font-weight: 700; }
+  .metric-card .mc-stat .l { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .metric-card .mc-actions { display: flex; gap: 0.5rem; }
+  .inactive-badge { padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600; background: rgba(107,122,153,0.15); color: var(--muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;">
+  <div>
+    <h2 style="font-size:1.1rem;font-weight:700;">Metrics & KPIs</h2>
+    <p style="font-size:0.8rem;color:var(--muted);margin-top:0.2rem;">Define the criteria by which members earn or lose points.</p>
+  </div>
+  <button class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('open')">+ New Metric</button>
+</div>
+
+<div class="metrics-grid">
+  {% for m in metrics %}
+  <div class="metric-card">
+    <div class="mc-stripe" style="background: {{ m.color }};"></div>
+    <div style="padding-left:0.75rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.25rem;">
+        <div class="mc-icon">{{ m.icon }}</div>
+        {% if not m.is_active %}<span class="inactive-badge">Inactive</span>{% endif %}
+      </div>
+      <div class="mc-name">{{ m.name }}</div>
+      <div class="mc-desc">{{ m.description or 'No description.' }}</div>
+      <div class="mc-stats">
+        <div class="mc-stat">
+          <div class="v" style="color: {{ m.color }};">{{ m.total_distributed }}</div>
+          <div class="l">Pts Given</div>
+        </div>
+        <div class="mc-stat">
+          <div class="v">{{ m.max_points }}</div>
+          <div class="l">Max Pts</div>
+        </div>
+        <div class="mc-stat">
+          <div class="v">{{ m.entries.count() }}</div>
+          <div class="l">Entries</div>
+        </div>
+      </div>
+      <div class="mc-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openEdit({{ m.id }}, '{{ m.name }}', '{{ m.description or '' }}', '{{ m.icon }}', '{{ m.color }}', {{ m.max_points }}, {{ m.is_active | lower }})">
+          Edit
+        </button>
+        <form method="POST" action="/admin/metrics/{{ m.id }}/delete" onsubmit="return confirm('Delete metric {{ m.name }}? This will remove all associated point entries.')">
+          <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--muted);">
+    <div style="font-size:2rem;margin-bottom:0.5rem;">📏</div>
+    No metrics yet. Create your first KPI.
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Add Modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('addModal').classList.remove('open')">✕</button>
+    <h3>📏 Create New Metric</h3>
+    <form method="POST" action="/admin/metrics/add">
+      <div class="form-group">
+        <label>Metric Name *</label>
+        <input type="text" name="name" placeholder="e.g. Community Service Hours" required />
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea name="description" placeholder="What does this metric measure?"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Icon (emoji)</label>
+          <input type="text" name="icon" value="⭐" maxlength="4" placeholder="⭐" />
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <input type="color" name="color" value="#0072CE" style="height:42px;padding:0.25rem;" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Maximum Points Per Entry</label>
+        <input type="number" name="max_points" value="100" min="1" max="9999" />
+      </div>
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:0.5rem;">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Metric</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('editModal').classList.remove('open')">✕</button>
+    <h3>✏️ Edit Metric</h3>
+    <form method="POST" id="editForm">
+      <div class="form-group">
+        <label>Metric Name</label>
+        <input type="text" name="name" id="editName" required />
+      </div>
+      <div class="form-group">
+        <label>Description</label>
+        <textarea name="description" id="editDesc"></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Icon (emoji)</label>
+          <input type="text" name="icon" id="editIcon" maxlength="4" />
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <input type="color" name="color" id="editColor" style="height:42px;padding:0.25rem;" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Maximum Points</label>
+        <input type="number" name="max_points" id="editMax" min="1" />
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;">
+        <input type="checkbox" name="is_active" id="editActive" style="width:auto;" />
+        <label for="editActive" style="text-transform:none;letter-spacing:0;margin-bottom:0;">Active metric</label>
+      </div>
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:0.5rem;">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('editModal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEdit(id, name, desc, icon, color, maxPts, isActive) {
+  document.getElementById('editForm').action = `/admin/metrics/${id}/edit`;
+  document.getElementById('editName').value = name;
+  document.getElementById('editDesc').value = desc;
+  document.getElementById('editIcon').value = icon;
+  document.getElementById('editColor').value = color;
+  document.getElementById('editMax').value = maxPts;
+  document.getElementById('editActive').checked = isActive;
+  document.getElementById('editModal').classList.add('open');
+}
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+});
+</script>
+
+{% endblock %}

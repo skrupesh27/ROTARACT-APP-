@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rotaract Club of Palghar — Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #06061a;
+      --card: #0d0d25;
+      --border: #1a1a3e;
+      --blue: #0072CE;
+      --gold: #F7A81B;
+      --text: #e2e8f0;
+      --muted: #7a8499;
+      --error: #ef4444;
+      --success: #10b981;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 50% at 20% 20%, rgba(0,114,206,0.12) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 80% 80%, rgba(247,168,27,0.08) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .login-wrap {
+      width: 100%;
+      max-width: 420px;
+      padding: 2rem;
+      position: relative;
+      z-index: 1;
+    }
+    .brand {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+    .brand-emblem {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--blue) 0%, #0056a8 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      margin: 0 auto 1rem;
+      box-shadow: 0 0 30px rgba(0,114,206,0.4);
+      border: 2px solid rgba(247,168,27,0.3);
+    }
+    .brand h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+    .brand p {
+      font-size: 0.8rem;
+      color: var(--gold);
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-top: 0.25rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+    }
+    .card h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1.75rem;
+      color: var(--text);
+    }
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+    label {
+      display: block;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+    input {
+      width: 100%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      color: var(--text);
+      font-size: 0.95rem;
+      font-family: 'Inter', sans-serif;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    input:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(0,114,206,0.15);
+    }
+    .btn {
+      width: 100%;
+      padding: 0.85rem;
+      background: var(--blue);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      margin-top: 0.5rem;
+    }
+    .btn:hover { background: #005fad; }
+    .btn:active { transform: scale(0.99); }
+    .flash {
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      margin-bottom: 1.25rem;
+    }
+    .flash.error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+    .flash.success { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); color: #6ee7b7; }
+    .demo-hint {
+      margin-top: 1.25rem;
+      padding: 0.75rem 1rem;
+      background: rgba(247,168,27,0.06);
+      border: 1px solid rgba(247,168,27,0.15);
+      border-radius: 8px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .demo-hint strong { color: var(--gold); }
+    .footer-text {
+      text-align: center;
+      margin-top: 1.5rem;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+    .rotary-wheel {
+      position: fixed;
+      bottom: -100px;
+      right: -100px;
+      width: 400px;
+      height: 400px;
+      opacity: 0.03;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <svg class="rotary-wheel" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="100" cy="100" r="95" stroke="#F7A81B" stroke-width="4"/>
+    <circle cx="100" cy="100" r="30" stroke="#F7A81B" stroke-width="4"/>
+    {% for i in range(6) %}
+    <line x1="100" y1="70" x2="100" y2="5" stroke="#F7A81B" stroke-width="4" transform="rotate({{ i * 60 }} 100 100)"/>
+    {% endfor %}
+  </svg>
+
+  <div class="login-wrap">
+    <div class="brand">
+      <div class="brand-emblem">🔵</div>
+      <h1>Rotaract Club of Palghar</h1>
+      <p>Performance Tracker</p>
+    </div>
+
+    <div class="card">
+      <h2>Sign in to your account</h2>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+          <div class="flash {{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <form method="POST" action="/login">
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" name="email" placeholder="you@example.com" required autofocus />
+        </div>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" placeholder="Enter your password" required />
+        </div>
+        <button type="submit" class="btn">Sign In →</button>
+      </form>
+
+      <div class="demo-hint">
+        <strong>Demo credentials</strong><br/>
+        Admin: <strong>admin@rotaract-palghar.org</strong> / <strong>admin123</strong><br/>
+        Member: <strong>aarav@example.com</strong> / <strong>member123</strong>
+      </div>
+    </div>
+
+    <p class="footer-text">Rotaract Club of Palghar &bull; District 3140 &bull; Service Above Self</p>
+  </div>
+</body>
+</html>

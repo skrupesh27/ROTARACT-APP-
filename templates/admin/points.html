@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+{% block title %}Assign Points — Admin{% endblock %}
+{% block page_title %}Assign Points{% endblock %}
+
+{% block head %}
+<style>
+  .points-layout { display: grid; grid-template-columns: 360px 1fr; gap: 1.25rem; align-items: start; }
+  .assign-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; position: sticky; top: 70px; }
+  .assign-panel h3 { font-size: 1rem; font-weight: 700; margin-bottom: 1.25rem; }
+
+  .pts-input-wrap { position: relative; }
+  .pts-input { font-size: 1.5rem; font-weight: 700; text-align: center; padding: 0.75rem; }
+  .pts-quick { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.5rem; }
+  .pts-quick-btn {
+    padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.78rem; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border); background: var(--card2);
+    color: var(--text); font-family: 'Inter', sans-serif; transition: all 0.15s;
+  }
+  .pts-quick-btn:hover { border-color: var(--blue); color: var(--blue); }
+  .pts-quick-btn.neg { color: var(--danger); border-color: rgba(239,68,68,0.2); }
+  .pts-quick-btn.neg:hover { border-color: var(--danger); background: rgba(239,68,68,0.06); }
+
+  .entries-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .entries-panel-header { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .entries-panel-header h3 { font-size: 0.9rem; font-weight: 700; }
+
+  .filter-row { display: flex; gap: 0.5rem; }
+  .filter-select { background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.6rem; color: var(--text); font-size: 0.8rem; font-family: 'Inter', sans-serif; outline: none; }
+  .filter-select:focus { border-color: var(--blue); }
+
+  .entry-table { width: 100%; border-collapse: collapse; }
+  .entry-table th { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; padding: 0.75rem 1.25rem; text-align: left; border-bottom: 1px solid var(--border); }
+  .entry-table td { padding: 0.75rem 1.25rem; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+  .entry-table tr:last-child td { border-bottom: none; }
+  .entry-table tr:hover td { background: rgba(255,255,255,0.015); }
+
+  .member-chip { display: flex; align-items: center; gap: 0.5rem; }
+  .mini-av { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="points-layout">
+
+  <!-- Assign Points Form -->
+  <div class="assign-panel">
+    <h3>⭐ Assign Points</h3>
+    <form method="POST" action="/admin/points/add">
+
+      <div class="form-group">
+        <label>Member *</label>
+        <select name="member_id" required>
+          <option value="" disabled selected>Select a member...</option>
+          {% for m in members %}
+          <option value="{{ m.id }}">{{ m.name }} ({{ m.total_points }} pts)</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Metric / Category *</label>
+        <select name="metric_id" required>
+          <option value="" disabled selected>Select a metric...</option>
+          {% for m in metrics %}
+          <option value="{{ m.id }}">{{ m.icon }} {{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Points (negative to deduct)</label>
+        <div class="pts-input-wrap">
+          <input type="number" name="points" id="ptsInput" class="pts-input" value="10" min="-999" max="999" required />
+        </div>
+        <div class="pts-quick">
+          <button type="button" class="pts-quick-btn" onclick="setPts(10)">+10</button>
+          <button type="button" class="pts-quick-btn" onclick="setPts(20)">+20</button>
+          <button type="button" class="pts-quick-btn" onclick="setPts(30)">+30</button>
+          <button type="button" class="pts-quick-btn" onclick="setPts(50)">+50</button>
+          <button type="button" class="pts-quick-btn" onclick="setPts(100)">+100</button>
+          <button type="button" class="pts-quick-btn neg" onclick="setPts(-10)">−10</button>
+          <button type="button" class="pts-quick-btn neg" onclick="setPts(-25)">−25</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" name="date" value="{{ today }}" />
+      </div>
+
+      <div class="form-group">
+        <label>Note / Reason</label>
+        <textarea name="note" placeholder="e.g. Attended Blood Donation Drive, Organised event..." rows="2"></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width:100%;">Assign Points</button>
+    </form>
+  </div>
+
+  <!-- Entries Table -->
+  <div class="entries-panel">
+    <div class="entries-panel-header">
+      <h3>Recent Point Entries</h3>
+      <div class="filter-row">
+        <select class="filter-select" id="filterMember" onchange="filterEntries()">
+          <option value="">All Members</option>
+          {% for m in members %}
+          <option value="{{ m.name | lower }}">{{ m.name }}</option>
+          {% endfor %}
+        </select>
+        <select class="filter-select" id="filterMetric" onchange="filterEntries()">
+          <option value="">All Metrics</option>
+          {% for m in metrics %}
+          <option value="{{ m.name | lower }}">{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <table class="entry-table" id="entryTable">
+      <thead>
+        <tr>
+          <th>Member</th>
+          <th>Metric</th>
+          <th>Points</th>
+          <th>Date</th>
+          <th>Note</th>
+          <th>By</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+        <tr data-member="{{ e.member.name | lower }}" data-metric="{{ e.metric.name | lower }}">
+          <td>
+            <div class="member-chip">
+              <div class="mini-av" style="background: hsl({{ loop.index * 37 }}, 55%, 30%);">{{ e.member.initials }}</div>
+              {{ e.member.name }}
+            </div>
+          </td>
+          <td>
+            <span style="color: {{ e.metric.color }}; font-weight:500;">{{ e.metric.icon }} {{ e.metric.name }}</span>
+          </td>
+          <td class="{% if e.points >= 0 %}pts-positive{% else %}pts-negative{% endif %}">
+            {{ '+' if e.points >= 0 else '' }}{{ e.points }}
+          </td>
+          <td style="color:var(--muted);font-size:0.82rem;">{{ e.date.strftime('%d %b %Y') }}</td>
+          <td style="color:var(--muted);font-size:0.8rem;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            {{ e.note or '—' }}
+          </td>
+          <td style="color:var(--muted);font-size:0.78rem;">{{ e.added_by.name.split()[0] if e.added_by else '—' }}</td>
+          <td>
+            <form method="POST" action="/admin/points/{{ e.id }}/delete" onsubmit="return confirm('Remove this point entry?')">
+              <button type="submit" class="btn btn-danger btn-sm">✕</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:2rem;">No point entries yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+  const today = new Date().toISOString().split('T')[0];
+  // Set today's date if not set
+  document.querySelector('input[name="date"]').value = today;
+
+  function setPts(v) {
+    document.getElementById('ptsInput').value = v;
+  }
+
+  function filterEntries() {
+    const member = document.getElementById('filterMember').value;
+    const metric = document.getElementById('filterMetric').value;
+    document.querySelectorAll('#entryTable tbody tr').forEach(row => {
+      const mName = row.dataset.member || '';
+      const mMetric = row.dataset.metric || '';
+      const show = (!member || mName.includes(member)) && (!metric || mMetric.includes(metric));
+      row.style.display = show ? '' : 'none';
+    });
+  }
+</script>
+
+{% endblock %}

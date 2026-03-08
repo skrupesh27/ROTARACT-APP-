@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% block title %}Comparison Dashboard — Admin{% endblock %}
+{% block page_title %}Member Comparison{% endblock %}
+
+{% block head %}
+<style>
+  .comp-selector {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.5rem; margin-bottom: 1.5rem;
+  }
+  .comp-selector h3 { font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem; }
+  .member-select-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.6rem; max-height: 280px; overflow-y: auto; padding: 0.25rem; margin-bottom: 1rem; }
+  .member-chip {
+    display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0.75rem;
+    border-radius: 8px; border: 2px solid var(--border); background: rgba(255,255,255,0.02);
+    cursor: pointer; transition: all 0.15s; user-select: none;
+  }
+  .member-chip:hover { border-color: rgba(0,114,206,0.3); }
+  .member-chip.selected { border-color: var(--blue); background: rgba(0,114,206,0.1); }
+  .chip-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 700; flex-shrink: 0; }
+  .chip-name { font-size: 0.82rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip-pts { font-size: 0.72rem; color: var(--muted); }
+
+  .results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .result-card {
+    background: var(--card); border: 2px solid var(--border); border-radius: 12px; padding: 1.25rem;
+    text-align: center; transition: border-color 0.2s;
+  }
+  .result-card.winner { border-color: var(--gold); }
+  .result-card .rc-av { width: 54px; height: 54px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: 700; margin: 0 auto 0.75rem; }
+  .result-card .rc-name { font-size: 0.95rem; font-weight: 700; margin-bottom: 0.15rem; }
+  .result-card .rc-pos { font-size: 0.72rem; color: var(--muted); margin-bottom: 0.75rem; }
+  .result-card .rc-pts { font-size: 1.8rem; font-weight: 800; color: var(--blue); line-height: 1; }
+  .result-card .rc-pts-lbl { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .result-card .rc-stats { display: flex; justify-content: center; gap: 1.5rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
+  .result-card .rc-stat .sv { font-size: 1rem; font-weight: 700; }
+  .result-card .rc-stat .sl { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; }
+  .winner-crown { font-size: 1.1rem; }
+
+  .charts-section { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; margin-bottom: 1.5rem; }
+  .chart-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+  .chart-panel h4 { font-size: 0.8rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 1rem; }
+  .chart-h { height: 260px; position: relative; }
+
+  .no-data { text-align: center; padding: 4rem 2rem; color: var(--muted); }
+  .no-data .nd-icon { font-size: 3rem; margin-bottom: 0.75rem; }
+  .no-data .nd-title { font-size: 1rem; font-weight: 600; margin-bottom: 0.35rem; color: var(--text); }
+  .no-data p { font-size: 0.85rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Selector -->
+<div class="comp-selector">
+  <h3>⚖️ Select Members to Compare</h3>
+  <div class="member-select-grid" id="memberSelectGrid">
+    {% for m in members %}
+    <div class="member-chip" data-id="{{ m.id }}" data-name="{{ m.name }}" onclick="toggleMember(this)">
+      <div class="chip-av" style="background: hsl({{ loop.index * 40 }}, 55%, 30%);">{{ m.initials }}</div>
+      <div>
+        <div class="chip-name">{{ m.name.split()[0] }}</div>
+        <div class="chip-pts">{{ m.total_points }} pts</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div style="display:flex;align-items:center;gap:0.75rem;">
+    <button class="btn btn-primary" onclick="loadComparison()" id="compareBtn" disabled>Compare Selected</button>
+    <button class="btn btn-ghost" onclick="clearSelection()">Clear</button>
+    <span id="selectionCount" style="font-size:0.82rem;color:var(--muted);">Select 2–5 members</span>
+  </div>
+</div>
+
+<!-- Results area -->
+<div id="resultsArea">
+  <div class="no-data">
+    <div class="nd-icon">⚖️</div>
+    <div class="nd-title">No comparison yet</div>
+    <p>Select 2 or more members above and click Compare to generate a side-by-side analysis.</p>
+  </div>
+</div>
+
+<script>
+const COLORS = ['#0072CE', '#F7A81B', '#10b981', '#8b5cf6', '#ef4444'];
+let selected = new Set();
+let radarChart = null, lineChart = null, barChart = null;
+
+function toggleMember(el) {
+  const id = el.dataset.id;
+  if (selected.has(id)) {
+    selected.delete(id);
+    el.classList.remove('selected');
+  } else if (selected.size < 5) {
+    selected.add(id);
+    el.classList.add('selected');
+  }
+  updateUI();
+}
+
+function updateUI() {
+  const count = selected.size;
+  document.getElementById('compareBtn').disabled = count < 2;
+  document.getElementById('selectionCount').textContent =
+    count === 0 ? 'Select 2–5 members'
+    : count === 1 ? '1 selected — need at least 2'
+    : `${count} selected`;
+}
+
+function clearSelection() {
+  selected.clear();
+  document.querySelectorAll('.member-chip').forEach(el => el.classList.remove('selected'));
+  updateUI();
+  document.getElementById('resultsArea').innerHTML = `<div class="no-data"><div class="nd-icon">⚖️</div><div class="nd-title">No comparison yet</div><p>Select 2 or more members above and click Compare.</p></div>`;
+}
+
+function loadComparison() {
+  const ids = [...selected].join(',');
+  fetch(`/api/comparison?members=${ids}`)
+    .then(r => r.json())
+    .then(data => renderComparison(data));
+}
+
+function renderComparison(data) {
+  const { members, metric_labels, month_labels } = data;
+  const winner = members.reduce((a, b) => a.total_points >= b.total_points ? a : b);
+
+  let html = `<div class="results-grid">`;
+  members.forEach((m, i) => {
+    const isWinner = m.id === winner.id;
+    html += `
+      <div class="result-card ${isWinner ? 'winner' : ''}">
+        ${isWinner ? '<div class="winner-crown">👑 Top Performer</div>' : ''}
+        <div class="rc-av" style="background: ${COLORS[i]}33; color: ${COLORS[i]}; border: 2px solid ${COLORS[i]};">
+          ${m.name.split(' ').map(p=>p[0]).join('').toUpperCase().slice(0,2)}
+        </div>
+        <div class="rc-name">${m.name}</div>
+        <div class="rc-pos">${m.position}</div>
+        <div class="rc-pts">${m.total_points}</div>
+        <div class="rc-pts-lbl">Total Points</div>
+        <div class="rc-stats">
+          <div class="rc-stat">
+            <div class="sv" style="color:var(--success)">${m.points_this_month}</div>
+            <div class="sl">This Month</div>
+          </div>
+          <div class="rc-stat">
+            <div class="sv">${m.events_attended}</div>
+            <div class="sl">Events</div>
+          </div>
+        </div>
+      </div>`;
+  });
+  html += `</div>`;
+
+  html += `<div class="charts-section">
+    <div class="chart-panel">
+      <h4>📡 Performance Radar</h4>
+      <div class="chart-h"><canvas id="radarChart"></canvas></div>
+    </div>
+    <div class="chart-panel">
+      <h4>📈 Points Over Time (6 Months)</h4>
+      <div class="chart-h"><canvas id="lineChart"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-panel" style="margin-bottom:1.5rem;">
+    <h4>📊 Points by Category</h4>
+    <div style="height:240px;position:relative;"><canvas id="barChart"></canvas></div>
+  </div>`;
+
+  document.getElementById('resultsArea').innerHTML = html;
+
+  // Radar chart
+  new Chart(document.getElementById('radarChart'), {
+    type: 'radar',
+    data: {
+      labels: metric_labels.length ? metric_labels : ['No metrics'],
+      datasets: members.map((m, i) => ({
+        label: m.name.split(' ')[0],
+        data: metric_labels.map(l => m.metric_points[l] || 0),
+        borderColor: COLORS[i],
+        backgroundColor: COLORS[i] + '22',
+        pointBackgroundColor: COLORS[i],
+        borderWidth: 2, pointRadius: 3,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: {
+        r: {
+          grid: { color: 'rgba(255,255,255,0.06)' },
+          angleLines: { color: 'rgba(255,255,255,0.06)' },
+          pointLabels: { color: '#6b7a99', font: { size: 10 } },
+          ticks: { color: '#6b7a99', backdropColor: 'transparent', font: { size: 9 } }
+        }
+      },
+      plugins: {
+        legend: { labels: { color: '#6b7a99', font: { size: 11 }, boxWidth: 10, padding: 10 } },
+        tooltip: { backgroundColor: '#0d0d28', borderColor: '#1a1a40', borderWidth: 1 }
+      }
+    }
+  });
+
+  // Line chart
+  new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+      labels: month_labels,
+      datasets: members.map((m, i) => ({
+        label: m.name.split(' ')[0],
+        data: m.monthly_trend,
+        borderColor: COLORS[i],
+        backgroundColor: COLORS[i] + '15',
+        borderWidth: 2, pointRadius: 4, pointBackgroundColor: COLORS[i],
+        tension: 0.4, fill: false,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#6b7a99', font: { size: 11 }, boxWidth: 10, padding: 10 } },
+        tooltip: { backgroundColor: '#0d0d28', borderColor: '#1a1a40', borderWidth: 1 }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7a99', font: { size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7a99', font: { size: 10 } } }
+      }
+    }
+  });
+
+  // Grouped bar chart by category
+  new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: metric_labels,
+      datasets: members.map((m, i) => ({
+        label: m.name.split(' ')[0],
+        data: metric_labels.map(l => m.metric_points[l] || 0),
+        backgroundColor: COLORS[i] + 'bb',
+        borderColor: COLORS[i],
+        borderWidth: 1, borderRadius: 4,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: '#6b7a99', font: { size: 11 }, boxWidth: 10, padding: 10 } },
+        tooltip: { backgroundColor: '#0d0d28', borderColor: '#1a1a40', borderWidth: 1 }
+      },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7a99', font: { size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7a99', font: { size: 10 } } }
+      }
+    }
+  });
+}
+</script>
+
+{% endblock %}

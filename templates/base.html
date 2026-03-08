@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Rotaract Club of Palghar{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #06061a;
+      --sidebar: #080820;
+      --card: #0d0d28;
+      --card2: #10102f;
+      --border: #1a1a40;
+      --blue: #0072CE;
+      --blue-dim: #0060b0;
+      --gold: #F7A81B;
+      --text: #e2e8f0;
+      --muted: #6b7a99;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --purple: #8b5cf6;
+      --sidebar-w: 240px;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+    }
+    /* ── Sidebar ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      min-height: 100vh;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      z-index: 100;
+    }
+    .sidebar-brand {
+      padding: 1.5rem 1.25rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-brand .emblem {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: var(--blue);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem;
+      margin-bottom: 0.6rem;
+      box-shadow: 0 0 15px rgba(0,114,206,0.4);
+    }
+    .sidebar-brand h1 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.3;
+    }
+    .sidebar-brand p {
+      font-size: 0.65rem;
+      color: var(--gold);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 500;
+      margin-top: 0.15rem;
+    }
+    .sidebar-nav {
+      flex: 1;
+      padding: 1rem 0.75rem;
+      overflow-y: auto;
+    }
+    .nav-label {
+      font-size: 0.62rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      font-weight: 600;
+      padding: 0.5rem 0.5rem 0.35rem;
+      margin-top: 0.5rem;
+    }
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.6rem 0.75rem;
+      border-radius: 8px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      transition: all 0.15s;
+      margin-bottom: 0.1rem;
+    }
+    .nav-link:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+    .nav-link.active { background: rgba(0,114,206,0.15); color: var(--blue); border: 1px solid rgba(0,114,206,0.2); }
+    .nav-link .icon { font-size: 1rem; width: 20px; text-align: center; }
+    .sidebar-footer {
+      padding: 1rem 0.75rem;
+      border-top: 1px solid var(--border);
+    }
+    .user-card {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      padding: 0.6rem 0.75rem;
+      border-radius: 8px;
+      background: rgba(255,255,255,0.03);
+      text-decoration: none;
+      transition: background 0.15s;
+    }
+    .user-card:hover { background: rgba(255,255,255,0.06); }
+    .avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--blue);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    .avatar img { width: 100%; height: 100%; object-fit: cover; }
+    /* Notification badge */
+    .nav-badge {
+      margin-left: auto;
+      background: var(--danger);
+      color: #fff;
+      font-size: 0.6rem;
+      font-weight: 700;
+      padding: 0.1rem 0.42rem;
+      border-radius: 999px;
+      min-width: 18px;
+      text-align: center;
+    }
+    .user-info { flex: 1; min-width: 0; }
+    .user-info .name { font-size: 0.8rem; font-weight: 600; truncate: ellipsis; overflow: hidden; white-space: nowrap; }
+    .user-info .role { font-size: 0.65rem; color: var(--muted); }
+    .logout-btn {
+      font-size: 0.72rem;
+      color: var(--muted);
+      text-decoration: none;
+      padding: 0.25rem;
+    }
+    .logout-btn:hover { color: var(--danger); }
+
+    /* ── Main ── */
+    .main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    .topbar {
+      height: 56px;
+      background: var(--sidebar);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 1.75rem;
+      position: sticky; top: 0; z-index: 50;
+    }
+    .topbar-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .badge-pill {
+      padding: 0.2rem 0.65rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+    .badge-admin { background: rgba(247,168,27,0.15); color: var(--gold); border: 1px solid rgba(247,168,27,0.25); }
+    .badge-member { background: rgba(0,114,206,0.15); color: var(--blue); border: 1px solid rgba(0,114,206,0.25); }
+
+    .content { padding: 1.75rem; flex: 1; }
+
+    /* ── Cards ── */
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+    .card-title { font-size: 0.8rem; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.5rem; }
+    .card-value { font-size: 2rem; font-weight: 700; color: var(--text); line-height: 1; }
+    .card-sub { font-size: 0.78rem; color: var(--muted); margin-top: 0.3rem; }
+
+    /* ── Grid ── */
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+    .grid-12 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+    /* ── Flashes ── */
+    .flash-container { padding: 0 1.75rem; margin-bottom: -0.75rem; }
+    .flash { padding: 0.65rem 1rem; border-radius: 8px; font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .flash.error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2); color: #fca5a5; }
+    .flash.success { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.2); color: #6ee7b7; }
+
+    /* ── Buttons ── */
+    .btn { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.55rem 1rem; border-radius: 8px; font-size: 0.85rem; font-weight: 600; font-family: 'Inter', sans-serif; cursor: pointer; border: none; transition: all 0.15s; text-decoration: none; }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-primary:hover { background: var(--blue-dim); }
+    .btn-gold { background: var(--gold); color: #000; }
+    .btn-gold:hover { background: #d9950f; }
+    .btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+    .btn-danger { background: rgba(239,68,68,0.1); color: var(--danger); border: 1px solid rgba(239,68,68,0.2); }
+    .btn-danger:hover { background: rgba(239,68,68,0.2); }
+    .btn-sm { padding: 0.35rem 0.65rem; font-size: 0.78rem; }
+
+    /* ── Table ── */
+    table { width: 100%; border-collapse: collapse; }
+    th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--border); }
+    td { padding: 0.75rem 1rem; font-size: 0.875rem; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* ── Modal ── */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: none; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px); }
+    .modal-overlay.open { display: flex; }
+    .modal { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto; box-shadow: 0 40px 80px rgba(0,0,0,0.6); }
+    .modal h3 { font-size: 1.1rem; font-weight: 700; margin-bottom: 1.5rem; }
+    .modal-close { float: right; background: none; border: none; color: var(--muted); font-size: 1.25rem; cursor: pointer; line-height: 1; }
+    .modal-close:hover { color: var(--text); }
+
+    /* ── Form ── */
+    .form-group { margin-bottom: 1rem; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    label { display: block; font-size: 0.75rem; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem; }
+    input, select, textarea {
+      width: 100%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.65rem 0.9rem;
+      color: var(--text);
+      font-size: 0.875rem;
+      font-family: 'Inter', sans-serif;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(0,114,206,0.12);
+    }
+    select option { background: #0d0d28; }
+    textarea { resize: vertical; min-height: 80px; }
+
+    /* ── Rank Badges ── */
+    .rank-1 { color: var(--gold); font-weight: 700; }
+    .rank-2 { color: #94a3b8; font-weight: 600; }
+    .rank-3 { color: #b45309; font-weight: 600; }
+
+    /* ── Points badge ── */
+    .pts-positive { color: var(--success); font-weight: 600; }
+    .pts-negative { color: var(--danger); font-weight: 600; }
+
+    /* ── Tag ── */
+    .tag { display: inline-flex; align-items: center; padding: 0.2rem 0.55rem; border-radius: 6px; font-size: 0.72rem; font-weight: 600; }
+    .tag-blue { background: rgba(0,114,206,0.15); color: #60a5fa; }
+    .tag-gold { background: rgba(247,168,27,0.15); color: var(--gold); }
+    .tag-green { background: rgba(16,185,129,0.15); color: #34d399; }
+    .tag-purple { background: rgba(139,92,246,0.15); color: #a78bfa; }
+
+    /* ── Section header ── */
+    .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .section-head h2 { font-size: 1rem; font-weight: 700; }
+
+    @media (max-width: 900px) {
+      .grid-4 { grid-template-columns: repeat(2, 1fr); }
+      .grid-3 { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+      .sidebar { transform: translateX(-100%); transition: transform 0.3s; }
+      .sidebar.open { transform: none; }
+      .main { margin-left: 0; }
+      .grid-4, .grid-3, .grid-2, .grid-12 { grid-template-columns: 1fr; }
+    }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="emblem">🔵</div>
+      <h1>Rotaract Club<br/>of Palghar</h1>
+      <p>Performance Tracker</p>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-label">Member</div>
+      <a href="/dashboard" class="nav-link {% if request.path == '/dashboard' %}active{% endif %}">
+        <span class="icon">📊</span> Dashboard
+      </a>
+      <a href="/absence" class="nav-link {% if request.path.startswith('/absence') %}active{% endif %}">
+        <span class="icon">🙋</span> Absence Requests
+        {% if pending_absence_count and current_user.role != 'admin' %}
+          <span class="nav-badge">{{ pending_absence_count }}</span>
+        {% endif %}
+      </a>
+      <a href="/disputes" class="nav-link {% if request.path.startswith('/disputes') %}active{% endif %}">
+        <span class="icon">💬</span> Complaints / Q&A
+        {% if open_dispute_count and current_user.role != 'admin' %}
+          <span class="nav-badge">{{ open_dispute_count }}</span>
+        {% endif %}
+      </a>
+
+      {% if current_user.role == 'admin' %}
+      <div class="nav-label" style="margin-top:1rem;">Admin</div>
+      <a href="/admin/dashboard" class="nav-link {% if request.path == '/admin/dashboard' %}active{% endif %}">
+        <span class="icon">🏠</span> Admin Overview
+      </a>
+      <a href="/admin/members" class="nav-link {% if request.path == '/admin/members' %}active{% endif %}">
+        <span class="icon">👥</span> Members
+      </a>
+      <a href="/admin/metrics" class="nav-link {% if request.path == '/admin/metrics' %}active{% endif %}">
+        <span class="icon">📏</span> Metrics & KPIs
+      </a>
+      <a href="/admin/points" class="nav-link {% if request.path == '/admin/points' %}active{% endif %}">
+        <span class="icon">⭐</span> Assign Points
+      </a>
+      <a href="/admin/events" class="nav-link {% if request.path.startswith('/admin/events') %}active{% endif %}">
+        <span class="icon">📅</span> Events
+      </a>
+      <a href="/admin/absence-requests" class="nav-link {% if request.path == '/admin/absence-requests' %}active{% endif %}">
+        <span class="icon">🙋</span> Absence Requests
+        {% if pending_absence_count %}
+          <span class="nav-badge">{{ pending_absence_count }}</span>
+        {% endif %}
+      </a>
+      <a href="/admin/disputes" class="nav-link {% if request.path == '/admin/disputes' %}active{% endif %}">
+        <span class="icon">💬</span> Disputes / Q&A
+        {% if open_dispute_count %}
+          <span class="nav-badge">{{ open_dispute_count }}</span>
+        {% endif %}
+      </a>
+      <a href="/admin/comparison" class="nav-link {% if request.path == '/admin/comparison' %}active{% endif %}">
+        <span class="icon">⚖️</span> Comparison
+      </a>
+      {% endif %}
+    </nav>
+
+    <div class="sidebar-footer">
+      <a href="/profile" class="user-card">
+        <div class="avatar">
+          {% if current_user.profile_picture %}
+            <img src="/static/uploads/avatars/{{ current_user.profile_picture }}" alt="avatar" />
+          {% else %}
+            {{ current_user.initials }}
+          {% endif %}
+        </div>
+        <div class="user-info">
+          <div class="name">{{ current_user.name.split()[0] }}</div>
+          <div class="role">{{ current_user.position }}</div>
+        </div>
+        <a href="/logout" class="logout-btn" title="Logout" onclick="event.stopPropagation()">⏏</a>
+      </a>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <span class="topbar-title">{% block page_title %}Dashboard{% endblock %}</span>
+      <div class="topbar-actions">
+        <span class="badge-pill {% if current_user.role == 'admin' %}badge-admin{% else %}badge-member{% endif %}">
+          {{ current_user.role | capitalize }}
+        </span>
+        <span style="font-size:0.85rem; color:var(--muted);">{{ current_user.name }}</span>
+      </div>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-container" style="padding-top:1rem;">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <main class="content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>

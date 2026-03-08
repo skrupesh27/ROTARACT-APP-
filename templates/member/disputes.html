@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Complaints & Q&A — Rotaract{% endblock %}
+{% block page_title %}Complaints & Q&A{% endblock %}
+
+{% block head %}
+<style>
+  .page-layout { display: grid; grid-template-columns: 1fr 360px; gap: 1.25rem; align-items: start; }
+
+  .disputes-list { display: flex; flex-direction: column; gap: 0.75rem; }
+  .dispute-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.1rem 1.25rem; transition: border-color 0.15s;
+  }
+  .dispute-card:hover { border-color: rgba(255,255,255,0.1); }
+  .dc-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.5rem; gap: 1rem; }
+  .dc-subject { font-size: 0.95rem; font-weight: 700; }
+  .dc-context { font-size: 0.72rem; color: var(--muted); margin-top: 0.15rem; }
+  .dc-message { font-size: 0.83rem; color: var(--muted); line-height: 1.55; border-left: 3px solid var(--border); padding-left: 0.75rem; margin: 0.6rem 0; }
+  .dc-time { font-size: 0.7rem; color: var(--muted); }
+
+  .admin-reply { background: rgba(0,114,206,0.06); border: 1px solid rgba(0,114,206,0.15); border-radius: 8px; padding: 0.65rem 0.85rem; margin-top: 0.6rem; }
+  .reply-label { font-size: 0.65rem; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.3rem; }
+  .reply-text { font-size: 0.83rem; color: var(--muted); }
+
+  .status-badge { padding: 0.18rem 0.55rem; border-radius: 5px; font-size: 0.65rem; font-weight: 700; flex-shrink: 0; }
+  .status-open { background: rgba(247,168,27,0.15); color: var(--gold); }
+  .status-resolved { background: rgba(16,185,129,0.15); color: #34d399; }
+  .status-rejected { background: rgba(239,68,68,0.15); color: #f87171; }
+
+  .form-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; position: sticky; top: 70px; }
+  .form-panel h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .form-panel p { font-size: 0.8rem; color: var(--muted); margin-bottom: 1.25rem; }
+
+  .info-box { padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.8rem; margin-bottom: 1.25rem; }
+  .info-blue { background: rgba(0,114,206,0.08); border: 1px solid rgba(0,114,206,0.15); color: #93c5fd; }
+
+  .empty-state { text-align: center; padding: 3rem; color: var(--muted); }
+  .empty-state .ei { font-size: 2.5rem; margin-bottom: 0.5rem; }
+  .empty-state p { font-size: 0.85rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="info-box info-blue">
+  ℹ️ Use this section to ask the admin about missing points, incorrect entries, or any questions about your performance record.
+</div>
+
+<div class="page-layout">
+
+  <!-- Left: My disputes list -->
+  <div>
+    {% if my_disputes %}
+    <div class="disputes-list">
+      {% for d in my_disputes %}
+      <div class="dispute-card">
+        <div class="dc-header">
+          <div>
+            <div class="dc-subject">{{ d.subject }}</div>
+            <div class="dc-context">
+              {% if d.metric_name %}📏 {{ d.metric_name }}{% endif %}
+              {% if d.event_name %} · 📅 {{ d.event_name }}{% endif %}
+            </div>
+          </div>
+          <span class="status-badge status-{{ d.status }}">
+            {% if d.status == 'open' %}⏳ Awaiting Reply
+            {% elif d.status == 'resolved' %}✓ Resolved
+            {% else %}✕ Dismissed
+            {% endif %}
+          </span>
+        </div>
+        <div class="dc-message">{{ d.message }}</div>
+        <div class="dc-time">Submitted {{ d.created_at.strftime('%d %b %Y, %I:%M %p') }}</div>
+
+        {% if d.admin_response %}
+        <div class="admin-reply">
+          <div class="reply-label">Admin Response {% if d.resolved_at %}· {{ d.resolved_at.strftime('%d %b %Y') }}{% endif %}</div>
+          <div class="reply-text">{{ d.admin_response }}</div>
+        </div>
+        {% elif d.status == 'open' %}
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.5rem;font-style:italic;">
+          ⏳ Waiting for admin response...
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="ei">💬</div>
+      <p>No complaints or questions yet.<br/>Use the form to raise one.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right: New dispute form -->
+  <div class="form-panel">
+    <h3>💬 Raise a Complaint or Question</h3>
+    <p>Missing points? Wrong entry? Something unclear? Ask the admin directly.</p>
+
+    <form method="POST" action="/disputes/add">
+      <div class="form-group">
+        <label>Subject *</label>
+        <input type="text" name="subject" placeholder="e.g. Missing points for Blood Donation Drive" required />
+      </div>
+
+      <div class="form-group">
+        <label>Related Metric (optional)</label>
+        <select name="metric_name">
+          <option value="">Select a metric...</option>
+          {% for m in metrics %}
+          <option value="{{ m.name }}">{{ m.icon }} {{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Related Event (optional)</label>
+        <select name="event_name">
+          <option value="">Select an event...</option>
+          {% for e in recent_events %}
+          <option value="{{ e.title }}">{{ e.title }} — {{ e.date.strftime('%d %b %Y') }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Your Message *</label>
+        <textarea name="message" rows="5" placeholder="Describe your question or complaint in detail. Include dates, event names, and expected vs actual points..." required></textarea>
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width:100%;">Submit Complaint / Question</button>
+    </form>
+
+    <div style="margin-top:1rem;padding:0.75rem;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px;font-size:0.75rem;color:var(--muted);">
+      💡 Tips for a faster response:<br/>
+      · Be specific about which event or metric<br/>
+      · Mention the date and expected points<br/>
+      · Check the leaderboard first to confirm the discrepancy
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

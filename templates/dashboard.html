@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% block title %}My Dashboard — Rotaract Club of Palghar{% endblock %}
+{% block page_title %}Member Dashboard{% endblock %}
+
+{% block head %}
+<style>
+  .hero { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+  .hero-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero-card::before {
+    content: '';
+    position: absolute;
+    top: -20px; right: -20px;
+    width: 80px; height: 80px;
+    border-radius: 50%;
+    opacity: 0.07;
+  }
+  .hero-card.blue::before { background: var(--blue); }
+  .hero-card.gold::before { background: var(--gold); }
+  .hero-card.green::before { background: var(--success); }
+  .hero-card.purple::before { background: var(--purple); }
+  .hero-card .icon { font-size: 1.4rem; margin-bottom: 0.6rem; }
+  .hero-card .val { font-size: 2.2rem; font-weight: 700; line-height: 1; }
+  .hero-card .lbl { font-size: 0.78rem; color: var(--muted); margin-top: 0.3rem; }
+  .hero-card .accent-blue { color: var(--blue); }
+  .hero-card .accent-gold { color: var(--gold); }
+  .hero-card .accent-green { color: var(--success); }
+  .hero-card .accent-purple { color: var(--purple); }
+
+  .main-grid { display: grid; grid-template-columns: 1fr 340px; gap: 1.25rem; }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
+  .panel-title { font-size: 0.82rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.4rem; }
+
+  /* Leaderboard */
+  .lb-row {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .lb-row:last-child { border-bottom: none; }
+  .lb-rank { width: 24px; text-align: center; font-size: 0.85rem; font-weight: 700; flex-shrink: 0; }
+  .lb-avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; }
+  .lb-info { flex: 1; min-width: 0; }
+  .lb-name { font-size: 0.875rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb-pos { font-size: 0.72rem; color: var(--muted); }
+  .lb-pts { font-size: 0.9rem; font-weight: 700; flex-shrink: 0; }
+  .lb-bar-wrap { height: 3px; background: rgba(255,255,255,0.06); border-radius: 99px; margin-top: 0.3rem; }
+  .lb-bar { height: 3px; border-radius: 99px; background: var(--blue); }
+  .lb-row.me { background: rgba(0,114,206,0.06); border-radius: 8px; padding: 0.6rem 0.5rem; border-bottom: none !important; margin: 0.25rem -0.5rem; }
+
+  /* Events */
+  .event-item {
+    display: flex; align-items: flex-start; gap: 0.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .event-item:last-child { border-bottom: none; }
+  .event-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+  .event-title { font-size: 0.85rem; font-weight: 500; margin-bottom: 0.2rem; }
+  .event-meta { font-size: 0.72rem; color: var(--muted); }
+  .event-type-badge { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; margin-right: 0.35rem; }
+
+  /* Activity */
+  .activity-item {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .activity-item:last-child { border-bottom: none; }
+  .activity-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; flex-shrink: 0; }
+  .activity-text { flex: 1; }
+  .activity-text .a-desc { font-size: 0.82rem; }
+  .activity-text .a-time { font-size: 0.7rem; color: var(--muted); }
+  .activity-pts { font-size: 0.9rem; font-weight: 700; flex-shrink: 0; }
+
+  /* Chart canvas */
+  .chart-wrap { position: relative; height: 200px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero Stats -->
+<div class="hero">
+  <div class="hero-card blue">
+    <div class="icon">⭐</div>
+    <div class="val accent-blue">{{ current_user.total_points }}</div>
+    <div class="lbl">Total Points</div>
+  </div>
+  <div class="hero-card gold">
+    <div class="icon">🏆</div>
+    <div class="val accent-gold">#{{ my_rank }}</div>
+    <div class="lbl">Club Rank</div>
+  </div>
+  <div class="hero-card green">
+    <div class="icon">📅</div>
+    <div class="val accent-green">{{ current_user.events_attended }}</div>
+    <div class="lbl">Events Attended</div>
+  </div>
+  <div class="hero-card purple">
+    <div class="icon">📈</div>
+    <div class="val accent-purple">{{ current_user.points_this_month }}</div>
+    <div class="lbl">Points This Month</div>
+  </div>
+</div>
+
+<div class="main-grid">
+  <!-- Left column -->
+  <div>
+
+    <!-- Points Breakdown Chart -->
+    <div class="panel">
+      <div class="panel-title">📊 Points Breakdown by Category</div>
+      <div class="chart-wrap">
+        <canvas id="breakdownChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="panel">
+      <div class="panel-title">🏆 Club Leaderboard — Top 10</div>
+      {% for m in leaderboard %}
+      <div class="lb-row {% if m.id == current_user.id %}me{% endif %}">
+        <div class="lb-rank">
+          {% if loop.index == 1 %}🥇
+          {% elif loop.index == 2 %}🥈
+          {% elif loop.index == 3 %}🥉
+          {% else %}<span style="color:var(--muted)">{{ loop.index }}</span>
+          {% endif %}
+        </div>
+        <div class="lb-avatar" style="background: hsl({{ loop.index * 37 }}, 60%, 35%);">
+          {{ m.initials }}
+        </div>
+        <div class="lb-info">
+          <div class="lb-name">{{ m.name }}{% if m.id == current_user.id %} <span style="color:var(--blue);font-size:0.7rem;">(You)</span>{% endif %}</div>
+          <div class="lb-pos">{{ m.position }}</div>
+          {% if leaderboard[0].total_points > 0 %}
+          <div class="lb-bar-wrap">
+            <div class="lb-bar" style="width: {{ [(m.total_points / leaderboard[0].total_points * 100) | int, 100] | min }}%; background: {% if loop.index == 1 %}var(--gold){% else %}var(--blue){% endif %}"></div>
+          </div>
+          {% endif %}
+        </div>
+        <div class="lb-pts" style="color: {% if loop.index == 1 %}var(--gold){% else %}var(--text){% endif %}">{{ m.total_points }}</div>
+      </div>
+      {% else %}
+      <p style="color:var(--muted);font-size:0.85rem;">No members yet.</p>
+      {% endfor %}
+    </div>
+
+  </div>
+
+  <!-- Right column -->
+  <div>
+
+    <!-- Upcoming Events -->
+    <div class="panel">
+      <div class="panel-title">📅 Upcoming Events</div>
+
+      {% if cal_connected %}
+        <div style="font-size:0.72rem;color:var(--success);margin-bottom:0.75rem;">🟢 Google Calendar connected</div>
+      {% endif %}
+
+      {% for event in upcoming_events %}
+      <div class="event-item">
+        <div class="event-dot" style="background: {{ event.type_color }};"></div>
+        <div>
+          <div class="event-title">{{ event.title }}</div>
+          <div class="event-meta">
+            <span class="event-type-badge" style="background:{{ event.type_color }}22; color:{{ event.type_color }}">{{ event.event_type | capitalize }}</span>
+            {{ event.date.strftime('%d %b %Y, %I:%M %p') }}
+            {% if event.location %} · {{ event.location }}{% endif %}
+          </div>
+          {% if event.points_for_attendance > 0 %}
+          <div style="font-size:0.7rem;color:var(--gold);margin-top:0.2rem;">+{{ event.points_for_attendance }} pts for attendance</div>
+          {% endif %}
+        </div>
+      </div>
+      {% else %}
+      <p style="color:var(--muted);font-size:0.85rem;">No upcoming events scheduled.</p>
+      {% endfor %}
+
+      {% if calendar_events %}
+      <div style="margin-top:0.75rem;border-top:1px solid var(--border);padding-top:0.75rem;">
+        <div class="panel-title" style="margin-bottom:0.5rem;">📆 From Google Calendar</div>
+        {% for ev in calendar_events %}
+        <div class="event-item">
+          <div class="event-dot" style="background: #0072CE;"></div>
+          <div>
+            <div class="event-title">{{ ev.title }}</div>
+            <div class="event-meta">{{ ev.start }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- My Recent Activity -->
+    <div class="panel">
+      <div class="panel-title">⚡ My Recent Activity</div>
+      {% for entry in recent_activity %}
+      <div class="activity-item">
+        <div class="activity-icon" style="background: rgba(0,114,206,0.12);">{{ entry.metric.icon }}</div>
+        <div class="activity-text">
+          <div class="a-desc">{{ entry.metric.name }}</div>
+          <div class="a-time">{{ entry.date.strftime('%d %b %Y') }}{% if entry.note %} · {{ entry.note[:40] }}{% endif %}</div>
+        </div>
+        <div class="activity-pts {% if entry.points >= 0 %}pts-positive{% else %}pts-negative{% endif %}">
+          {{ '+' if entry.points >= 0 else '' }}{{ entry.points }}
+        </div>
+      </div>
+      {% else %}
+      <p style="color:var(--muted);font-size:0.85rem;">No activity recorded yet.</p>
+      {% endfor %}
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // Points breakdown donut chart
+  const statsData = {{ current_user.points_by_metric() | tojson }};
+
+  if (statsData.length > 0) {
+    const ctx = document.getElementById('breakdownChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: statsData.map(d => d.name),
+        datasets: [{
+          data: statsData.map(d => d.points),
+          backgroundColor: statsData.map(d => d.color + 'cc'),
+          borderColor: statsData.map(d => d.color),
+          borderWidth: 2,
+          hoverOffset: 6,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '65%',
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: {
+              color: '#6b7a99',
+              font: { size: 11, family: 'Inter' },
+              padding: 12,
+              boxWidth: 12,
+            }
+          },
+          tooltip: {
+            backgroundColor: '#0d0d28',
+            borderColor: '#1a1a40',
+            borderWidth: 1,
+            titleColor: '#e2e8f0',
+            bodyColor: '#6b7a99',
+          }
+        }
+      }
+    });
+  } else {
+    document.querySelector('.chart-wrap').innerHTML = '<p style="color:var(--muted);font-size:0.85rem;padding-top:4rem;text-align:center;">No point data yet. Points will appear here once assigned.</p>';
+  }
+</script>
+
+{% endblock %}

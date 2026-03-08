@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Disputes & Q&A — Admin{% endblock %}
+{% block page_title %}Disputes & Q&A{% endblock %}
+
+{% block head %}
+<style>
+  .page-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .panel-head { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); }
+  .panel-head h2 { font-size: 0.95rem; font-weight: 700; }
+
+  .dispute-row { padding: 1.1rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .dispute-row:last-child { border-bottom: none; }
+  .d-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.6rem; }
+  .d-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; flex-shrink: 0; overflow: hidden; }
+  .d-av img { width: 100%; height: 100%; object-fit: cover; }
+  .d-meta { flex: 1; }
+  .d-name { font-size: 0.875rem; font-weight: 600; }
+  .d-subject { font-size: 1rem; font-weight: 700; margin-bottom: 0.35rem; }
+  .d-context { font-size: 0.72rem; color: var(--muted); }
+  .d-message { background: rgba(255,255,255,0.03); border-left: 3px solid var(--blue); padding: 0.65rem 0.85rem; border-radius: 0 6px 6px 0; font-size: 0.83rem; color: var(--muted); margin-bottom: 0.75rem; line-height: 1.5; }
+  .d-time { font-size: 0.7rem; color: var(--muted); margin-bottom: 0.6rem; }
+
+  .respond-form { display: flex; flex-direction: column; gap: 0.5rem; }
+  .respond-form textarea { resize: none; min-height: 70px; font-size: 0.83rem; }
+  .respond-actions { display: flex; gap: 0.5rem; }
+
+  .status-badge { display: inline-block; padding: 0.18rem 0.55rem; border-radius: 5px; font-size: 0.65rem; font-weight: 700; }
+  .status-open { background: rgba(247,168,27,0.15); color: var(--gold); }
+  .status-resolved { background: rgba(16,185,129,0.15); color: #34d399; }
+  .status-rejected { background: rgba(239,68,68,0.15); color: #f87171; }
+
+  .admin-response { background: rgba(0,114,206,0.06); border: 1px solid rgba(0,114,206,0.15); border-radius: 8px; padding: 0.65rem 0.85rem; font-size: 0.82rem; margin-top: 0.5rem; }
+  .admin-response .ar-label { font-size: 0.65rem; color: var(--blue); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.3rem; }
+
+  .empty-state { padding: 3rem 1.5rem; text-align: center; color: var(--muted); }
+  .empty-state .ei { font-size: 2.5rem; margin-bottom: 0.5rem; }
+
+  @media (max-width: 800px) { .page-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div style="margin-bottom:1.5rem;">
+  <h2 style="font-size:1.1rem;font-weight:700;">Member Disputes & Q&A</h2>
+  <p style="font-size:0.82rem;color:var(--muted);margin-top:0.25rem;">Respond to member complaints about missing points or general questions.</p>
+</div>
+
+<div class="page-grid">
+
+  <!-- Open disputes -->
+  <div class="panel">
+    <div class="panel-head">
+      <h2>🟡 Open ({{ open_disputes | length }})</h2>
+    </div>
+    {% for d in open_disputes %}
+    <div class="dispute-row">
+      <div class="d-header">
+        <div class="d-av" style="background: hsl({{ loop.index * 45 }}, 55%, 30%);">
+          {% if d.member.profile_picture %}
+            <img src="/static/uploads/avatars/{{ d.member.profile_picture }}" alt="{{ d.member.initials }}" />
+          {% else %}
+            {{ d.member.initials }}
+          {% endif %}
+        </div>
+        <div class="d-meta">
+          <div class="d-name">{{ d.member.name }}</div>
+          <div class="d-context">
+            {% if d.metric_name %}📏 {{ d.metric_name }}{% endif %}
+            {% if d.event_name %} · 📅 {{ d.event_name }}{% endif %}
+          </div>
+        </div>
+        <span class="status-badge status-open">Open</span>
+      </div>
+
+      <div class="d-subject">{{ d.subject }}</div>
+      <div class="d-time">Submitted {{ d.created_at.strftime('%d %b %Y, %I:%M %p') }}</div>
+      <div class="d-message">{{ d.message }}</div>
+
+      <form method="POST" action="/admin/disputes/{{ d.id }}/respond" class="respond-form">
+        <textarea name="response" placeholder="Write your response to {{ d.member.name.split()[0] }}..." required></textarea>
+        <div class="respond-actions">
+          <button type="submit" name="action" value="resolved" class="btn btn-sm" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.25);">
+            ✓ Resolve
+          </button>
+          <button type="submit" name="action" value="rejected" class="btn btn-danger btn-sm">
+            ✕ Dismiss
+          </button>
+        </div>
+      </form>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="ei">💬</div>
+      <p>No open disputes.<br/>All member questions have been answered.</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Resolved disputes -->
+  <div class="panel">
+    <div class="panel-head">
+      <h2>✅ Resolved ({{ resolved | length }})</h2>
+    </div>
+    {% for d in resolved %}
+    <div class="dispute-row">
+      <div class="d-header">
+        <div class="d-av" style="background: hsl({{ loop.index * 55 }}, 50%, 30%);">
+          {% if d.member.profile_picture %}
+            <img src="/static/uploads/avatars/{{ d.member.profile_picture }}" alt="{{ d.member.initials }}" />
+          {% else %}
+            {{ d.member.initials }}
+          {% endif %}
+        </div>
+        <div class="d-meta">
+          <div class="d-name">{{ d.member.name }}</div>
+          <div class="d-context">{{ d.created_at.strftime('%d %b %Y') }}</div>
+        </div>
+        <span class="status-badge status-{{ d.status }}">{{ d.status | capitalize }}</span>
+      </div>
+      <div class="d-subject">{{ d.subject }}</div>
+      <div class="d-message">{{ d.message }}</div>
+      {% if d.admin_response %}
+      <div class="admin-response">
+        <div class="ar-label">Admin Response</div>
+        {{ d.admin_response }}
+      </div>
+      {% endif %}
+      {% if d.resolved_by %}
+      <div style="font-size:0.68rem;color:var(--muted);margin-top:0.4rem;">
+        Resolved by {{ d.resolved_by.name.split()[0] }} on {{ d.resolved_at.strftime('%d %b %Y') if d.resolved_at else '—' }}
+      </div>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="ei">📋</div>
+      <p>No resolved disputes yet.</p>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+
+{% endblock %}

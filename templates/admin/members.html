@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+{% block title %}Members — Admin{% endblock %}
+{% block page_title %}Members Management{% endblock %}
+
+{% block head %}
+<style>
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+  .search-box { display: flex; align-items: center; gap: 0.75rem; }
+  .search-input { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 0.55rem 1rem; color: var(--text); font-size: 0.875rem; font-family: 'Inter', sans-serif; outline: none; width: 240px; }
+  .search-input:focus { border-color: var(--blue); }
+
+  .members-table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .members-table { width: 100%; border-collapse: collapse; }
+  .members-table th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; padding: 0.85rem 1.25rem; text-align: left; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.02); }
+  .members-table td { padding: 0.85rem 1.25rem; font-size: 0.875rem; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; }
+  .members-table tr:last-child td { border-bottom: none; }
+  .members-table tr:hover td { background: rgba(255,255,255,0.015); }
+
+  .member-cell { display: flex; align-items: center; gap: 0.75rem; }
+  .m-av { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700; flex-shrink: 0; }
+  .m-name { font-weight: 500; }
+  .m-email { font-size: 0.72rem; color: var(--muted); }
+
+  .role-badge { padding: 0.2rem 0.6rem; border-radius: 6px; font-size: 0.72rem; font-weight: 600; }
+  .role-admin { background: rgba(247,168,27,0.15); color: var(--gold); }
+  .role-member { background: rgba(0,114,206,0.12); color: #60a5fa; }
+  .status-active { color: var(--success); }
+  .status-inactive { color: var(--muted); }
+
+  .action-btns { display: flex; align-items: center; gap: 0.4rem; }
+
+  /* Stats summary */
+  .summary-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  .sum-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.75rem; }
+  .sum-icon { font-size: 1.4rem; }
+  .sum-val { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+  .sum-lbl { font-size: 0.75rem; color: var(--muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="summary-bar">
+  <div class="sum-card">
+    <div class="sum-icon">👥</div>
+    <div>
+      <div class="sum-val" style="color:var(--blue)">{{ members | selectattr('is_active_member') | list | length }}</div>
+      <div class="sum-lbl">Active Members</div>
+    </div>
+  </div>
+  <div class="sum-card">
+    <div class="sum-icon">🛡️</div>
+    <div>
+      <div class="sum-val" style="color:var(--gold)">{{ members | selectattr('role', 'eq', 'admin') | list | length }}</div>
+      <div class="sum-lbl">Admins</div>
+    </div>
+  </div>
+  <div class="sum-card">
+    <div class="sum-icon">😴</div>
+    <div>
+      <div class="sum-val" style="color:var(--muted)">{{ members | rejectattr('is_active_member') | list | length }}</div>
+      <div class="sum-lbl">Inactive</div>
+    </div>
+  </div>
+</div>
+
+<div class="page-header">
+  <h2 style="font-size:1.1rem;font-weight:700;">All Members</h2>
+  <div style="display:flex;gap:0.75rem;align-items:center;">
+    <input type="text" class="search-input" id="searchInput" placeholder="🔍 Search members..." oninput="filterMembers()" />
+    <button class="btn btn-primary" onclick="document.getElementById('addModal').classList.add('open')">+ Add Member</button>
+  </div>
+</div>
+
+<div class="members-table-wrap">
+  <table class="members-table" id="membersTable">
+    <thead>
+      <tr>
+        <th>Member</th>
+        <th>Position</th>
+        <th>Phone</th>
+        <th>Role</th>
+        <th>Points</th>
+        <th>Status</th>
+        <th>Joined</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in members %}
+      <tr data-name="{{ m.name | lower }}" data-email="{{ m.email | lower }}">
+        <td>
+          <div class="member-cell">
+            <div class="m-av" style="background: hsl({{ loop.index * 40 }}, 55%, 30%);">{{ m.initials }}</div>
+            <div>
+              <div class="m-name">{{ m.name }}</div>
+              <div class="m-email">{{ m.email }}</div>
+            </div>
+          </div>
+        </td>
+        <td style="color:var(--muted);">{{ m.position }}</td>
+        <td style="color:var(--muted);font-size:0.82rem;">{{ m.phone or '—' }}</td>
+        <td><span class="role-badge role-{{ m.role }}">{{ m.role | capitalize }}</span></td>
+        <td style="font-weight:700;color:var(--blue);">{{ m.total_points }}</td>
+        <td>
+          {% if m.is_active_member %}
+            <span class="status-active">● Active</span>
+          {% else %}
+            <span class="status-inactive">● Inactive</span>
+          {% endif %}
+        </td>
+        <td style="color:var(--muted);font-size:0.82rem;">{{ m.joined_date.strftime('%b %Y') if m.joined_date else '—' }}</td>
+        <td>
+          <div class="action-btns">
+            <button class="btn btn-ghost btn-sm" onclick="openEdit({{ m.id }}, '{{ m.name }}', '{{ m.position }}', '{{ m.phone or '' }}', '{{ m.role }}', {{ m.is_active_member | lower }})">Edit</button>
+            {% if m.id != current_user.id %}
+            <form method="POST" action="/admin/members/{{ m.id }}/delete" onsubmit="return confirm('Delete {{ m.name }}?')">
+              <button type="submit" class="btn btn-danger btn-sm">Del</button>
+            </form>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem;">No members found. Add your first member.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Add Member Modal -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('addModal').classList.remove('open')">✕</button>
+    <h3>➕ Add New Member</h3>
+    <form method="POST" action="/admin/members/add">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Full Name *</label>
+          <input type="text" name="name" placeholder="Rtn. Jane Doe" required />
+        </div>
+        <div class="form-group">
+          <label>Email *</label>
+          <input type="email" name="email" placeholder="jane@example.com" required />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Password *</label>
+          <input type="password" name="password" placeholder="Temporary password" required />
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="text" name="phone" placeholder="+91 98765 43210" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Position</label>
+          <select name="position">
+            <option>Member</option>
+            <option>President</option>
+            <option>Vice President</option>
+            <option>Secretary</option>
+            <option>Treasurer</option>
+            <option>Director - Community Service</option>
+            <option>Director - Projects</option>
+            <option>Director - International Service</option>
+            <option>Director - Vocational Service</option>
+            <option>Sergeant at Arms</option>
+            <option>PR Director</option>
+            <option>Joint Secretary</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Role</label>
+          <select name="role">
+            <option value="member">Member</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:0.5rem;">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('addModal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Member</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Member Modal -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('editModal').classList.remove('open')">✕</button>
+    <h3>✏️ Edit Member</h3>
+    <form method="POST" id="editForm">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" name="name" id="editName" required />
+        </div>
+        <div class="form-group">
+          <label>Phone</label>
+          <input type="text" name="phone" id="editPhone" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Position</label>
+          <select name="position" id="editPosition">
+            <option>Member</option>
+            <option>President</option>
+            <option>Vice President</option>
+            <option>Secretary</option>
+            <option>Treasurer</option>
+            <option>Director - Community Service</option>
+            <option>Director - Projects</option>
+            <option>Director - International Service</option>
+            <option>Director - Vocational Service</option>
+            <option>Sergeant at Arms</option>
+            <option>PR Director</option>
+            <option>Joint Secretary</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Role</label>
+          <select name="role" id="editRole">
+            <option value="member">Member</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>New Password (leave blank to keep current)</label>
+        <input type="password" name="password" placeholder="Enter new password" />
+      </div>
+      <div class="form-group" style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0;">
+        <input type="checkbox" name="is_active" id="editActive" style="width:auto;" />
+        <label for="editActive" style="text-transform:none;letter-spacing:0;margin-bottom:0;">Active member</label>
+      </div>
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:1.25rem;">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('editModal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openEdit(id, name, position, phone, role, isActive) {
+  document.getElementById('editForm').action = `/admin/members/${id}/edit`;
+  document.getElementById('editName').value = name;
+  document.getElementById('editPosition').value = position;
+  document.getElementById('editPhone').value = phone;
+  document.getElementById('editRole').value = role;
+  document.getElementById('editActive').checked = isActive;
+  document.getElementById('editModal').classList.add('open');
+}
+
+function filterMembers() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  document.querySelectorAll('#membersTable tbody tr').forEach(row => {
+    const name = row.dataset.name || '';
+    const email = row.dataset.email || '';
+    row.style.display = (name.includes(q) || email.includes(q)) ? '' : 'none';
+  });
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+</script>
+
+{% endblock %}

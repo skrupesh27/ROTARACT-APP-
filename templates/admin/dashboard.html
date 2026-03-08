@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard — Rotaract Club of Palghar{% endblock %}
+{% block page_title %}Admin Overview{% endblock %}
+
+{% block head %}
+<style>
+  .stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.25rem 1.25rem 1rem;
+    display: flex; flex-direction: column; gap: 0.25rem;
+    position: relative; overflow: hidden;
+  }
+  .stat-card .sc-icon { font-size: 1.6rem; margin-bottom: 0.4rem; }
+  .stat-card .sc-val { font-size: 2rem; font-weight: 700; line-height: 1; }
+  .stat-card .sc-lbl { font-size: 0.75rem; color: var(--muted); font-weight: 500; }
+  .stat-card .sc-glow {
+    position: absolute; top: -30px; right: -30px;
+    width: 100px; height: 100px; border-radius: 50%; opacity: 0.06;
+  }
+  .stat-card.c-blue .sc-val { color: var(--blue); }
+  .stat-card.c-blue .sc-glow { background: var(--blue); }
+  .stat-card.c-gold .sc-val { color: var(--gold); }
+  .stat-card.c-gold .sc-glow { background: var(--gold); }
+  .stat-card.c-green .sc-val { color: var(--success); }
+  .stat-card.c-green .sc-glow { background: var(--success); }
+  .stat-card.c-purple .sc-val { color: var(--purple); }
+  .stat-card.c-purple .sc-glow { background: var(--purple); }
+
+  .charts-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; }
+  .panel-title { font-size: 0.8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 1rem; }
+  .chart-wrap { position: relative; height: 240px; }
+  .chart-wrap-sm { position: relative; height: 180px; }
+
+  .bottom-grid { display: grid; grid-template-columns: 1fr 320px; gap: 1rem; }
+
+  /* Leaderboard full */
+  .lb-full-row {
+    display: grid;
+    grid-template-columns: 36px 36px 1fr 120px 80px 80px;
+    align-items: center; gap: 0.75rem;
+    padding: 0.6rem 0.5rem;
+    border-radius: 8px;
+    transition: background 0.15s;
+  }
+  .lb-full-row:hover { background: rgba(255,255,255,0.03); }
+  .lb-full-row.header { color: var(--muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; border-bottom: 1px solid var(--border); border-radius: 0; padding-bottom: 0.5rem; margin-bottom: 0.25rem; }
+  .lb-rank { text-align: center; font-size: 0.9rem; font-weight: 700; }
+  .lb-av { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; }
+  .lb-name-col .n { font-size: 0.875rem; font-weight: 500; }
+  .lb-name-col .p { font-size: 0.72rem; color: var(--muted); }
+
+  /* Activity feed */
+  .af-row { display: flex; align-items: center; gap: 0.65rem; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .af-row:last-child { border-bottom: none; }
+  .af-icon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; flex-shrink: 0; background: rgba(0,114,206,0.1); }
+  .af-info { flex: 1; min-width: 0; }
+  .af-desc { font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .af-time { font-size: 0.68rem; color: var(--muted); }
+  .af-pts { font-size: 0.85rem; font-weight: 700; flex-shrink: 0; }
+
+  /* Upcoming events */
+  .ue-row { padding: 0.6rem 0; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .ue-row:last-child { border-bottom: none; }
+  .ue-title { font-size: 0.85rem; font-weight: 500; }
+  .ue-meta { font-size: 0.72rem; color: var(--muted); margin-top: 0.15rem; }
+  .ue-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.35rem; vertical-align: middle; }
+
+  @media (max-width: 1100px) {
+    .charts-grid, .charts-row, .bottom-grid { grid-template-columns: 1fr; }
+    .stat-cards { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Stat cards -->
+<div class="stat-cards">
+  <div class="stat-card c-blue">
+    <div class="sc-glow"></div>
+    <div class="sc-icon">👥</div>
+    <div class="sc-val">{{ total_members }}</div>
+    <div class="sc-lbl">Active Members</div>
+  </div>
+  <div class="stat-card c-gold">
+    <div class="sc-glow"></div>
+    <div class="sc-icon">⭐</div>
+    <div class="sc-val">{{ total_points }}</div>
+    <div class="sc-lbl">Total Points Distributed</div>
+  </div>
+  <div class="stat-card c-green">
+    <div class="sc-glow"></div>
+    <div class="sc-icon">📅</div>
+    <div class="sc-val">{{ events_this_month }}</div>
+    <div class="sc-lbl">Events This Month</div>
+  </div>
+  <div class="stat-card c-purple">
+    <div class="sc-glow"></div>
+    <div class="sc-icon">📊</div>
+    <div class="sc-val">{{ avg_points }}</div>
+    <div class="sc-lbl">Avg Points / Member</div>
+  </div>
+</div>
+
+<!-- Main charts -->
+<div class="charts-grid">
+  <div class="panel">
+    <div class="panel-title">🏆 Top Members by Points</div>
+    <div class="chart-wrap">
+      <canvas id="topMembersChart"></canvas>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-title">🍩 Points by Category</div>
+    <div class="chart-wrap">
+      <canvas id="categoryChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="charts-row">
+  <div class="panel">
+    <div class="panel-title">📈 Points Trend — Last 6 Months</div>
+    <div class="chart-wrap-sm">
+      <canvas id="trendChart"></canvas>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="panel-title">📋 Event Type Distribution</div>
+    <div class="chart-wrap-sm">
+      <canvas id="eventTypeChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom: Leaderboard + Sidebar -->
+<div class="bottom-grid">
+
+  <!-- Full leaderboard -->
+  <div class="panel">
+    <div class="panel-title">🏅 Full Club Leaderboard</div>
+
+    <div class="lb-full-row header">
+      <span>Rank</span><span></span><span>Member</span>
+      <span>Points</span><span>Events</span><span>This Month</span>
+    </div>
+
+    {% for m in leaderboard %}
+    <div class="lb-full-row">
+      <div class="lb-rank">
+        {% if loop.index == 1 %}🥇
+        {% elif loop.index == 2 %}🥈
+        {% elif loop.index == 3 %}🥉
+        {% else %}<span style="color:var(--muted);font-size:0.8rem;">{{ loop.index }}</span>{% endif %}
+      </div>
+      <div class="lb-av" style="background: hsl({{ loop.index * 37 }}, 55%, 30%);">{{ m.initials }}</div>
+      <div class="lb-name-col">
+        <div class="n">{{ m.name }}</div>
+        <div class="p">{{ m.position }}</div>
+      </div>
+      <div style="font-weight:700;color:{% if loop.index==1 %}var(--gold){% else %}var(--text){% endif %}">{{ m.total_points }}</div>
+      <div style="color:var(--muted);font-size:0.85rem;">{{ m.events_attended }}</div>
+      <div style="color:var(--success);font-size:0.85rem;font-weight:600;">+{{ m.points_this_month }}</div>
+    </div>
+    {% else %}
+    <p style="color:var(--muted);font-size:0.85rem;">No members yet.</p>
+    {% endfor %}
+  </div>
+
+  <!-- Right sidebar -->
+  <div>
+
+    <!-- Upcoming events -->
+    <div class="panel" style="margin-bottom:1rem;">
+      <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>📅 Upcoming Events</span>
+        <a href="/admin/events" class="btn btn-ghost btn-sm">Manage</a>
+      </div>
+      {% for event in upcoming_events %}
+      <div class="ue-row">
+        <div class="ue-title">
+          <span class="ue-dot" style="background:{{ event.type_color }};"></span>{{ event.title }}
+        </div>
+        <div class="ue-meta">{{ event.date.strftime('%d %b, %I:%M %p') }} · {{ event.event_type | capitalize }}</div>
+      </div>
+      {% else %}
+      <p style="color:var(--muted);font-size:0.82rem;">No upcoming events.</p>
+      {% endfor %}
+      {% if cal_connected %}
+      <div style="font-size:0.7rem;color:var(--success);margin-top:0.5rem;">🟢 Google Calendar synced</div>
+      {% endif %}
+    </div>
+
+    <!-- Recent activity -->
+    <div class="panel">
+      <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>⚡ Recent Activity</span>
+        <a href="/admin/points" class="btn btn-ghost btn-sm">Add Points</a>
+      </div>
+      {% for entry in recent_entries %}
+      <div class="af-row">
+        <div class="af-icon">{{ entry.metric.icon }}</div>
+        <div class="af-info">
+          <div class="af-desc">{{ entry.member.name.split()[0] }} · {{ entry.metric.name }}</div>
+          <div class="af-time">{{ entry.date.strftime('%d %b %Y') }}{% if entry.note %} · {{ entry.note[:30] }}{% endif %}</div>
+        </div>
+        <div class="af-pts {% if entry.points >= 0 %}pts-positive{% else %}pts-negative{% endif %}">
+          {{ '+' if entry.points >= 0 else '' }}{{ entry.points }}
+        </div>
+      </div>
+      {% else %}
+      <p style="color:var(--muted);font-size:0.82rem;">No activity yet.</p>
+      {% endfor %}
+    </div>
+
+  </div>
+</div>
+
+<script>
+const CHART_DEFAULTS = {
+  color: '#6b7a99',
+  borderColor: '#1a1a40',
+  backgroundColor: '#0d0d28',
+};
+Chart.defaults.color = CHART_DEFAULTS.color;
+
+fetch('/api/chart-data').then(r => r.json()).then(data => {
+
+  // Top members bar
+  new Chart(document.getElementById('topMembersChart'), {
+    type: 'bar',
+    data: {
+      labels: data.top_members.labels,
+      datasets: [{
+        data: data.top_members.data,
+        backgroundColor: data.top_members.colors,
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0d0d28', borderColor: '#1a1a40', borderWidth: 1 } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7a99', font: { size: 11 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7a99', font: { size: 11 } } }
+      }
+    }
+  });
+
+  // Category donut
+  if (data.points_by_metric.data.length > 0) {
+    new Chart(document.getElementById('categoryChart'), {
+      type: 'doughnut',
+      data: {
+        labels: data.points_by_metric.labels,
+        datasets: [{
+          data: data.points_by_metric.data,
+          backgroundColor: data.points_by_metric.colors.map(c => c + 'cc'),
+          borderColor: data.points_by_metric.colors,
+          borderWidth: 2, hoverOffset: 6
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '65%',
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#6b7a99', font: { size: 10 }, boxWidth: 10, padding: 8 } },
+          tooltip: { backgroundColor: '#0d0d28', borderColor: '#1a1a40', borderWidth: 1 }
+        }
+      }
+    });
+  }
+
+  // Trend line
+  new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels: data.monthly_trend.map(d => d.month),
+      datasets: [{
+        data: data.monthly_trend.map(d => d.points),
+        borderColor: '#0072CE',
+        backgroundColor: 'rgba(0,114,206,0.08)',
+        borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#0072CE',
+        tension: 0.4, fill: true,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { backgroundColor: '#0d0d28', borderColor: '#1a1a40', borderWidth: 1 } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7a99', font: { size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#6b7a99', font: { size: 10 } } }
+      }
+    }
+  });
+
+  // Event types
+  if (data.event_types.data.length > 0) {
+    new Chart(document.getElementById('eventTypeChart'), {
+      type: 'pie',
+      data: {
+        labels: data.event_types.labels,
+        datasets: [{
+          data: data.event_types.data,
+          backgroundColor: ['rgba(0,114,206,0.7)', 'rgba(247,168,27,0.7)', 'rgba(16,185,129,0.7)', 'rgba(139,92,246,0.7)'],
+          borderColor: ['#0072CE', '#F7A81B', '#10b981', '#8b5cf6'],
+          borderWidth: 2, hoverOffset: 6,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#6b7a99', font: { size: 10 }, boxWidth: 10, padding: 8 } },
+          tooltip: { backgroundColor: '#0d0d28', borderColor: '#1a1a40', borderWidth: 1 }
+        }
+      }
+    });
+  }
+});
+</script>
+
+{% endblock %}

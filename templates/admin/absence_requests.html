@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Absence Requests — Admin{% endblock %}
+{% block page_title %}Absence Requests{% endblock %}
+
+{% block head %}
+<style>
+  .page-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .panel-head { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .panel-head h2 { font-size: 0.95rem; font-weight: 700; }
+  .panel-body { padding: 0.5rem 0; }
+
+  .req-row {
+    padding: 1rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .req-row:last-child { border-bottom: none; }
+  .req-header { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; }
+  .req-av { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex-shrink: 0; overflow: hidden; }
+  .req-av img { width: 100%; height: 100%; object-fit: cover; }
+  .req-meta { flex: 1; }
+  .req-name { font-size: 0.9rem; font-weight: 600; }
+  .req-event { font-size: 0.75rem; color: var(--muted); }
+  .req-date { font-size: 0.7rem; color: var(--muted); }
+
+  .req-reason {
+    background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.65rem 0.85rem; font-size: 0.82rem; color: var(--muted); margin-bottom: 0.75rem;
+    font-style: italic;
+  }
+  .req-reason::before { content: '"'; }
+  .req-reason::after { content: '"'; }
+
+  .action-form { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+  .note-input { flex: 1; min-width: 160px; background: rgba(255,255,255,0.04); border: 1px solid var(--border); border-radius: 6px; padding: 0.45rem 0.75rem; color: var(--text); font-size: 0.8rem; font-family: 'Inter', sans-serif; outline: none; }
+  .note-input:focus { border-color: var(--blue); }
+  .note-input::placeholder { color: var(--muted); }
+
+  .status-badge { display: inline-block; padding: 0.18rem 0.55rem; border-radius: 5px; font-size: 0.68rem; font-weight: 700; }
+  .status-pending { background: rgba(247,168,27,0.15); color: var(--gold); }
+  .status-approved { background: rgba(16,185,129,0.15); color: #34d399; }
+  .status-rejected { background: rgba(239,68,68,0.15); color: #f87171; }
+
+  .empty-state { padding: 3rem 1.5rem; text-align: center; color: var(--muted); }
+  .empty-state .ei { font-size: 2.5rem; margin-bottom: 0.5rem; }
+  .empty-state p { font-size: 0.85rem; }
+
+  .event-chip { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.15rem 0.5rem; border-radius: 5px; font-size: 0.7rem; font-weight: 600; margin-left: 0.3rem; }
+
+  @media (max-width: 800px) { .page-grid { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div style="margin-bottom:1.5rem;">
+  <h2 style="font-size:1.1rem;font-weight:700;">Absence Request Management</h2>
+  <p style="font-size:0.82rem;color:var(--muted);margin-top:0.25rem;">Members submit these to notify you before missing a meeting, project, or event.</p>
+</div>
+
+<div class="page-grid">
+
+  <!-- Pending requests -->
+  <div class="panel">
+    <div class="panel-head">
+      <h2>🟡 Pending Review ({{ pending | length }})</h2>
+    </div>
+    <div class="panel-body">
+      {% for req in pending %}
+      <div class="req-row">
+        <div class="req-header">
+          <div class="req-av" style="background: hsl({{ loop.index * 50 }}, 55%, 30%);">
+            {% if req.member.profile_picture %}
+              <img src="/static/uploads/avatars/{{ req.member.profile_picture }}" alt="{{ req.member.initials }}" />
+            {% else %}
+              {{ req.member.initials }}
+            {% endif %}
+          </div>
+          <div class="req-meta">
+            <div class="req-name">{{ req.member.name }}</div>
+            <div class="req-event">
+              for
+              <span class="event-chip" style="background: {{ req.event.type_color }}22; color: {{ req.event.type_color }};">
+                {{ req.event.title }}
+              </span>
+            </div>
+            <div class="req-date">
+              📅 {{ req.event.date.strftime('%d %b %Y') }} · Submitted {{ req.created_at.strftime('%d %b') }}
+            </div>
+          </div>
+        </div>
+
+        <div class="req-reason">{{ req.reason }}</div>
+
+        <div class="action-form">
+          <input type="text" class="note-input" id="note-{{ req.id }}" placeholder="Optional admin note..." />
+          <form method="POST" action="/admin/absence-requests/{{ req.id }}/approve" style="display:inline;"
+                onsubmit="document.querySelector('[name=note]', this).value = document.getElementById('note-{{ req.id }}').value">
+            <input type="hidden" name="note" />
+            <button type="submit" class="btn btn-sm" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.25);">
+              ✓ Approve
+            </button>
+          </form>
+          <form method="POST" action="/admin/absence-requests/{{ req.id }}/reject" style="display:inline;"
+                onsubmit="document.querySelector('[name=note]', this).value = document.getElementById('note-{{ req.id }}').value">
+            <input type="hidden" name="note" />
+            <button type="submit" class="btn btn-danger btn-sm">✕ Reject</button>
+          </form>
+        </div>
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <div class="ei">🎉</div>
+        <p>No pending absence requests.<br/>All members are accounted for.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- History -->
+  <div class="panel">
+    <div class="panel-head">
+      <h2>📋 Review History ({{ history | length }})</h2>
+    </div>
+    <div class="panel-body">
+      {% for req in history %}
+      <div class="req-row">
+        <div class="req-header">
+          <div class="req-av" style="background: hsl({{ loop.index * 55 }}, 50%, 30%);">
+            {% if req.member.profile_picture %}
+              <img src="/static/uploads/avatars/{{ req.member.profile_picture }}" alt="{{ req.member.initials }}" />
+            {% else %}
+              {{ req.member.initials }}
+            {% endif %}
+          </div>
+          <div class="req-meta">
+            <div class="req-name">
+              {{ req.member.name }}
+              <span class="status-badge status-{{ req.status }}">{{ req.status | capitalize }}</span>
+            </div>
+            <div class="req-event">
+              for <strong>{{ req.event.title }}</strong>
+              — {{ req.event.date.strftime('%d %b %Y') }}
+            </div>
+            <div class="req-date">
+              Reviewed {{ req.reviewed_at.strftime('%d %b %Y') if req.reviewed_at else '—' }}
+              {% if req.reviewed_by %} by {{ req.reviewed_by.name.split()[0] }}{% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="req-reason">{{ req.reason }}</div>
+        {% if req.admin_note %}
+        <div style="font-size:0.75rem;color:var(--muted);">Admin note: {{ req.admin_note }}</div>
+        {% endif %}
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <div class="ei">📋</div>
+        <p>No reviewed requests yet.</p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Fix form note injection
+document.querySelectorAll('.action-form form').forEach(form => {
+  form.addEventListener('submit', function() {
+    const noteId = this.closest('.action-form').querySelector('.note-input').id;
+    const noteVal = document.getElementById(noteId).value;
+    this.querySelector('input[name=note]').value = noteVal;
+  });
+});
+</script>
+
+{% endblock %}

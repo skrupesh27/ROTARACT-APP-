@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}My Profile — Rotaract{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+
+{% block head %}
+<style>
+  .profile-layout { display: grid; grid-template-columns: 300px 1fr; gap: 1.25rem; align-items: start; }
+  .profile-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; text-align: center; }
+  .profile-avatar-wrap { position: relative; display: inline-block; margin-bottom: 1rem; }
+  .profile-avatar {
+    width: 100px; height: 100px; border-radius: 50%;
+    background: var(--blue); display: flex; align-items: center; justify-content: center;
+    font-size: 2rem; font-weight: 700; color: #fff; overflow: hidden;
+    margin: 0 auto; border: 3px solid rgba(0,114,206,0.3);
+    box-shadow: 0 0 20px rgba(0,114,206,0.3);
+  }
+  .profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .profile-name { font-size: 1.2rem; font-weight: 800; margin-bottom: 0.25rem; }
+  .profile-position { font-size: 0.82rem; color: var(--gold); font-weight: 600; margin-bottom: 0.1rem; }
+  .profile-email { font-size: 0.78rem; color: var(--muted); margin-bottom: 1.25rem; }
+
+  .profile-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem; }
+  .ps-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; }
+  .ps-val { font-size: 1.4rem; font-weight: 800; line-height: 1; }
+  .ps-lbl { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.2rem; }
+
+  .upload-section { margin-top: 0.75rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+  .upload-label { display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .file-input-wrap { position: relative; }
+  .file-input-wrap input[type=file] { opacity: 0; position: absolute; inset: 0; cursor: pointer; width: 100%; }
+  .file-btn { display: block; width: 100%; padding: 0.6rem; background: rgba(0,114,206,0.1); border: 1px dashed rgba(0,114,206,0.3); border-radius: 8px; font-size: 0.8rem; color: var(--blue); cursor: pointer; text-align: center; margin-bottom: 0.5rem; transition: all 0.15s; }
+  .file-btn:hover { background: rgba(0,114,206,0.15); border-color: var(--blue); }
+
+  .right-panel { display: flex; flex-direction: column; gap: 1.25rem; }
+  .section-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  .section-head { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .section-head h2 { font-size: 0.9rem; font-weight: 700; }
+  .section-body { padding: 0.5rem 0; }
+
+  .disp-row { padding: 0.75rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .disp-row:last-child { border-bottom: none; }
+  .disp-subject { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.2rem; }
+  .disp-meta { font-size: 0.72rem; color: var(--muted); }
+  .admin-reply { background: rgba(0,114,206,0.06); border-left: 3px solid var(--blue); padding: 0.5rem 0.75rem; border-radius: 0 6px 6px 0; font-size: 0.8rem; margin-top: 0.5rem; color: var(--muted); }
+  .admin-reply strong { display: block; font-size: 0.65rem; color: var(--blue); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.2rem; }
+
+  .abs-row { padding: 0.75rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .abs-row:last-child { border-bottom: none; }
+  .abs-event { font-size: 0.875rem; font-weight: 600; }
+  .abs-reason { font-size: 0.75rem; color: var(--muted); margin: 0.2rem 0; }
+  .abs-status { display: inline-block; padding: 0.15rem 0.5rem; border-radius: 5px; font-size: 0.65rem; font-weight: 700; }
+
+  .status-pending { background: rgba(247,168,27,0.15); color: var(--gold); }
+  .status-approved { background: rgba(16,185,129,0.15); color: #34d399; }
+  .status-rejected { background: rgba(239,68,68,0.15); color: #f87171; }
+  .status-open { background: rgba(247,168,27,0.15); color: var(--gold); }
+  .status-resolved { background: rgba(16,185,129,0.15); color: #34d399; }
+
+  .empty-msg { padding: 1.5rem; text-align: center; color: var(--muted); font-size: 0.82rem; }
+
+  @media (max-width: 800px) { .profile-layout { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="profile-layout">
+
+  <!-- Left: Profile Card -->
+  <div class="profile-card">
+    <div class="profile-avatar-wrap">
+      <div class="profile-avatar">
+        {% if current_user.profile_picture %}
+          <img src="/static/uploads/avatars/{{ current_user.profile_picture }}" alt="avatar" />
+        {% else %}
+          {{ current_user.initials }}
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="profile-name">{{ current_user.name }}</div>
+    <div class="profile-position">{{ current_user.position }}</div>
+    <div class="profile-email">{{ current_user.email }}</div>
+
+    <div class="profile-stats">
+      <div class="ps-card">
+        <div class="ps-val" style="color:var(--blue);">{{ current_user.total_points }}</div>
+        <div class="ps-lbl">Total Points</div>
+      </div>
+      <div class="ps-card">
+        <div class="ps-val" style="color:var(--gold);">{{ current_user.points_this_month }}</div>
+        <div class="ps-lbl">This Month</div>
+      </div>
+      <div class="ps-card">
+        <div class="ps-val" style="color:var(--success);">{{ current_user.events_attended }}</div>
+        <div class="ps-lbl">Events</div>
+      </div>
+      <div class="ps-card">
+        <div class="ps-val" style="color:var(--purple);">{{ my_disputes | length }}</div>
+        <div class="ps-lbl">Disputes</div>
+      </div>
+    </div>
+
+    <div class="upload-section">
+      <span class="upload-label">Profile Picture</span>
+      <form method="POST" action="/profile/picture" enctype="multipart/form-data" id="picForm">
+        <div class="file-input-wrap">
+          <div class="file-btn" id="fileLabel">📷 Choose photo...</div>
+          <input type="file" name="picture" accept="image/*"
+                 onchange="document.getElementById('fileLabel').textContent = this.files[0]?.name || '📷 Choose photo...'; document.getElementById('picForm').submit();" />
+        </div>
+      </form>
+      {% if current_user.profile_picture %}
+      <form method="POST" action="/profile/picture/remove">
+        <button type="submit" class="btn btn-danger btn-sm" style="width:100%;margin-top:0.4rem;" onclick="return confirm('Remove profile picture?')">
+          Remove Photo
+        </button>
+      </form>
+      {% endif %}
+      <div style="font-size:0.68rem;color:var(--muted);margin-top:0.4rem;">PNG, JPG, GIF or WEBP — max 5MB</div>
+    </div>
+
+    {% if current_user.phone %}
+    <div style="margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);font-size:0.78rem;color:var(--muted);">
+      📱 {{ current_user.phone }}
+    </div>
+    {% endif %}
+    {% if current_user.joined_date %}
+    <div style="font-size:0.75rem;color:var(--muted);margin-top:0.3rem;">
+      Joined {{ current_user.joined_date.strftime('%B %Y') }}
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Right: Activity -->
+  <div class="right-panel">
+
+    <!-- Disputes -->
+    <div class="section-panel">
+      <div class="section-head">
+        <h2>💬 My Complaints & Questions</h2>
+        <a href="/disputes" class="btn btn-primary btn-sm">+ New</a>
+      </div>
+      <div class="section-body">
+        {% for d in my_disputes[:5] %}
+        <div class="disp-row">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.2rem;">
+            <div class="disp-subject">{{ d.subject }}</div>
+            <span class="abs-status status-{{ d.status }}">{{ d.status | capitalize }}</span>
+          </div>
+          <div class="disp-meta">
+            {% if d.metric_name %}📏 {{ d.metric_name }} · {% endif %}
+            {{ d.created_at.strftime('%d %b %Y') }}
+          </div>
+          {% if d.admin_response %}
+          <div class="admin-reply">
+            <strong>Admin Response</strong>
+            {{ d.admin_response }}
+          </div>
+          {% endif %}
+        </div>
+        {% else %}
+        <div class="empty-msg">No disputes yet. <a href="/disputes" style="color:var(--blue);">Raise a question</a></div>
+        {% endfor %}
+        {% if my_disputes | length > 5 %}
+        <div style="padding:0.75rem 1.25rem;">
+          <a href="/disputes" class="btn btn-ghost btn-sm">View all {{ my_disputes | length }} disputes →</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Absence requests -->
+    <div class="section-panel">
+      <div class="section-head">
+        <h2>🙋 My Absence Requests</h2>
+        <a href="/absence" class="btn btn-primary btn-sm">+ Request Absence</a>
+      </div>
+      <div class="section-body">
+        {% for req in my_absence[:5] %}
+        <div class="abs-row">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <div class="abs-event">{{ req.event.title }}</div>
+            <span class="abs-status status-{{ req.status }}">{{ req.status | capitalize }}</span>
+          </div>
+          <div class="abs-reason">{{ req.event.date.strftime('%d %b %Y') }} · "{{ req.reason[:80] }}"</div>
+          {% if req.admin_note %}
+          <div style="font-size:0.72rem;color:var(--muted);">Note: {{ req.admin_note }}</div>
+          {% endif %}
+        </div>
+        {% else %}
+        <div class="empty-msg">No absence requests. <a href="/absence" style="color:var(--blue);">Submit one</a></div>
+        {% endfor %}
+        {% if my_absence | length > 5 %}
+        <div style="padding:0.75rem 1.25rem;">
+          <a href="/absence" class="btn btn-ghost btn-sm">View all {{ my_absence | length }} requests →</a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
