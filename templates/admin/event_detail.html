@@ -89,7 +89,10 @@
 
 {% block content %}
 
-<a href="/admin/events" class="back-link">← Back to Events</a>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+  <a href="/admin/events" class="back-link" style="margin-bottom:0;">← Back to Events</a>
+  <a href="/events/{{ event.id }}" class="btn btn-ghost btn-sm">💬 Event Hub (Chat / Polls / Minutes)</a>
+</div>
 
 <!-- Event Hero -->
 <div class="event-hero">
@@ -114,6 +117,18 @@
     {% endif %}
   </div>
   <div class="stat-chips">
+    {% set days_left = (event.date.date() - today).days %}
+    {% if days_left > 0 %}
+    <div class="stat-chip" style="background:rgba(0,114,206,0.08);border-color:rgba(0,114,206,0.25);">
+      <div class="sv" style="color:var(--blue);">{{ days_left }}</div>
+      <div class="sl">Days Left</div>
+    </div>
+    {% elif days_left == 0 %}
+    <div class="stat-chip" style="background:rgba(247,168,27,0.1);border-color:rgba(247,168,27,0.3);">
+      <div class="sv" style="color:var(--gold);">🔥</div>
+      <div class="sl">Today</div>
+    </div>
+    {% endif %}
     <div class="stat-chip">
       <div class="sv" style="color:var(--success);">{{ attended_ids | length }}</div>
       <div class="sl">Present</div>
@@ -154,7 +169,7 @@
                    onchange="updateCount()" />
             <div class="roster-av" style="background: hsl({{ loop.index * 40 }}, 55%, 30%);">
               {% if m.profile_picture %}
-                <img src="/static/uploads/avatars/{{ m.profile_picture }}" alt="{{ m.initials }}" />
+                <img src="{{ m.profile_picture }}" alt="{{ m.initials }}" />
               {% else %}
                 {{ m.initials }}
               {% endif %}

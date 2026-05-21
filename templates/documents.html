@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+{% block title %}Club Documents — Rotaract{% endblock %}
+{% block page_title %}Club Documents{% endblock %}
+
+{% block head %}
+<style>
+  .docs-layout { display: grid; grid-template-columns: 260px 1fr; gap: 1.5rem; }
+  .folders-panel { display: flex; flex-direction: column; gap: 0.5rem; }
+  .folder-tab {
+    display: flex; align-items: center; gap: 0.65rem;
+    padding: 0.65rem 0.9rem; border-radius: 10px;
+    background: var(--card); border: 1px solid var(--border);
+    cursor: pointer; text-decoration: none; color: var(--text);
+    font-size: 0.875rem; font-weight: 500;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .folder-tab:hover { border-color: var(--blue); background: rgba(0,114,206,0.05); }
+  .folder-tab.active { border-color: var(--blue); background: rgba(0,114,206,0.12); color: var(--blue); }
+  .folder-tab .folder-icon { font-size: 1.1rem; flex-shrink: 0; }
+  .folder-tab .folder-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .folder-tab .folder-count {
+    font-size: 0.65rem; font-weight: 700;
+    background: rgba(255,255,255,0.07); color: var(--muted);
+    padding: 0.1rem 0.45rem; border-radius: 99px;
+    flex-shrink: 0;
+  }
+  .folder-tab.active .folder-count { background: rgba(0,114,206,0.2); color: var(--blue); }
+
+  .files-panel { display: flex; flex-direction: column; gap: 0.5rem; }
+
+  .doc-card {
+    display: flex; align-items: center; gap: 1rem;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 0.85rem 1.1rem;
+    transition: border-color 0.15s;
+  }
+  .doc-card:hover { border-color: rgba(0,114,206,0.4); }
+  .doc-icon { font-size: 1.6rem; flex-shrink: 0; width: 36px; text-align: center; }
+  .doc-info { flex: 1; min-width: 0; }
+  .doc-title { font-size: 0.875rem; font-weight: 600; margin-bottom: 0.2rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .doc-meta { font-size: 0.72rem; color: var(--muted); }
+  .doc-actions { display: flex; gap: 0.5rem; flex-shrink: 0; }
+
+  .empty-state {
+    text-align: center; padding: 3rem 1rem;
+    color: var(--muted); font-size: 0.875rem;
+    background: var(--card); border: 1px dashed var(--border); border-radius: 12px;
+  }
+  .empty-state .emoji { font-size: 2.5rem; margin-bottom: 0.75rem; }
+
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1rem;
+  }
+  .panel-header h2 { font-size: 1rem; font-weight: 700; }
+
+  /* Upload drop zone feel */
+  .upload-zone {
+    border: 1.5px dashed var(--border); border-radius: 10px;
+    padding: 1rem; text-align: center; cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .upload-zone:hover { border-color: var(--blue); }
+  .upload-zone input[type=file] { display: none; }
+  .upload-zone label { cursor: pointer; font-size: 0.85rem; color: var(--muted); }
+  .upload-zone label span { color: var(--blue); font-weight: 600; }
+  #selected-filename { font-size: 0.78rem; color: var(--success); margin-top: 0.4rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% set active_fid = request.args.get('folder', folders[0].id | string if folders else '') | int %}
+
+<div class="section-head">
+  <h2>Club Documents</h2>
+  {% if current_user.role == 'admin' %}
+  <button class="btn btn-primary btn-sm" onclick="openModal('modal-new-folder')">+ New Folder</button>
+  {% endif %}
+</div>
+
+{% if folders %}
+<div class="docs-layout">
+
+  <!-- Left: Folder list -->
+  <div class="folders-panel">
+    {% for folder in folders %}
+    <a href="/documents?folder={{ folder.id }}"
+       class="folder-tab {% if active_fid == folder.id %}active{% endif %}">
+      <span class="folder-icon">📂</span>
+      <span class="folder-name">{{ folder.name }}</span>
+      <span class="folder-count">{{ folder.documents.count() }}</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Right: Files in selected folder -->
+  <div>
+    {% set active_folder = folders | selectattr('id', 'equalto', active_fid) | first %}
+    {% if active_folder %}
+
+    <div class="panel-header">
+      <div>
+        <h2>📂 {{ active_folder.name }}</h2>
+        {% if active_folder.description %}
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:0.2rem;">{{ active_folder.description }}</div>
+        {% endif %}
+      </div>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        {% if current_user.role == 'admin' %}
+        <button class="btn btn-ghost btn-sm" onclick="openModal('modal-upload')">⬆ Upload</button>
+        <form method="POST" action="/admin/documents/folder/{{ active_folder.id }}/delete"
+              onsubmit="return confirm('Delete this folder and all its files?');" style="display:inline;">
+          <button class="btn btn-danger btn-sm" type="submit">🗑 Delete Folder</button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    {% set docs = active_folder.documents.order_by('created_at').all() %}
+    {% if docs %}
+    <div class="files-panel">
+      {% for doc in docs %}
+      <div class="doc-card">
+        <div class="doc-icon">{{ doc.file_icon }}</div>
+        <div class="doc-info">
+          <div class="doc-title">{{ doc.title }}</div>
+          <div class="doc-meta">
+            {{ doc.file_original_name }}
+            · {{ doc.created_at.strftime('%d %b %Y') }}
+            · by {{ doc.uploaded_by.name }}
+            {% if doc.file_size_kb > 0 %} · {{ doc.file_size_kb }} KB{% endif %}
+          </div>
+        </div>
+        <div class="doc-actions">
+          <a href="/documents/download/{{ doc.id }}" class="btn btn-ghost btn-sm">⬇ Download</a>
+          {% if current_user.role == 'admin' %}
+          <form method="POST" action="/admin/documents/{{ doc.id }}/delete"
+                onsubmit="return confirm('Delete this document?');" style="display:inline;">
+            <button class="btn btn-danger btn-sm" type="submit">🗑</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="emoji">📭</div>
+      No files in this folder yet.
+      {% if current_user.role == 'admin' %}
+      <br><button class="btn btn-primary btn-sm" style="margin-top:1rem;" onclick="openModal('modal-upload')">Upload a file</button>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+      <div class="emoji">👈</div>
+      Select a folder on the left.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% else %}
+<div class="empty-state">
+  <div class="emoji">📁</div>
+  No folders yet.
+  {% if current_user.role == 'admin' %}
+  <br><button class="btn btn-primary btn-sm" style="margin-top:1rem;" onclick="openModal('modal-new-folder')">Create the first folder</button>
+  {% endif %}
+</div>
+{% endif %}
+
+<!-- ── Modals (admin only) ─────────────────────────────────────────────── -->
+{% if current_user.role == 'admin' %}
+
+<!-- New Folder Modal -->
+<div class="modal-overlay" id="modal-new-folder">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-new-folder')">✕</button>
+    <h3>📁 New Folder</h3>
+    <form method="POST" action="/admin/documents/folder">
+      <div class="form-group">
+        <label>Folder Name *</label>
+        <input type="text" name="name" placeholder="e.g. Board Meeting Minutes" required autofocus>
+      </div>
+      <div class="form-group">
+        <label>Description (optional)</label>
+        <input type="text" name="description" placeholder="Short description...">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;">Create Folder</button>
+    </form>
+  </div>
+</div>
+
+<!-- Upload File Modal -->
+{% set active_folder_for_modal = folders | selectattr('id', 'equalto', active_fid) | first %}
+<div class="modal-overlay" id="modal-upload">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('modal-upload')">✕</button>
+    <h3>⬆ Upload File</h3>
+    <form method="POST" action="/admin/documents/upload" enctype="multipart/form-data">
+      <div class="form-group">
+        <label>Folder *</label>
+        <select name="folder_id" required>
+          {% for folder in folders %}
+          <option value="{{ folder.id }}" {% if folder.id == active_fid %}selected{% endif %}>{{ folder.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Display Title (optional)</label>
+        <input type="text" name="title" id="upload-title" placeholder="Leave blank to use filename">
+      </div>
+      <div class="form-group">
+        <label>File *</label>
+        <div class="upload-zone" onclick="document.getElementById('file-input').click()">
+          <input type="file" id="file-input" name="file"
+                 accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.png,.jpg,.jpeg,.gif,.zip,.rar"
+                 onchange="onFileSelected(this)" required>
+          <label for="file-input">
+            Click to select file or drag here<br>
+            <span>PDF, Word, Excel, PPT, Images, ZIP…</span>
+          </label>
+          <div id="selected-filename"></div>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;">Upload</button>
+    </form>
+  </div>
+</div>
+
+{% endif %}
+
+<script>
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+
+function onFileSelected(input) {
+  const name = input.files[0]?.name || '';
+  document.getElementById('selected-filename').textContent = name ? '✓ ' + name : '';
+  // Auto-fill title if blank
+  const titleInput = document.getElementById('upload-title');
+  if (titleInput && !titleInput.value && name) {
+    titleInput.value = name.replace(/\.[^.]+$/, '');
+  }
+}
+</script>
+{% endblock %}

@@ -107,6 +107,25 @@
   </div>
 </div>
 
+<!-- Fees Summary -->
+<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.5rem;">
+  <div class="panel" style="padding:1rem 1.25rem;border-color:rgba(16,185,129,0.3);">
+    <div style="font-size:0.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;">✅ Fees Paid</div>
+    <div style="font-size:1.8rem;font-weight:700;color:var(--success);">{{ fees_paid_count }}</div>
+    <div style="font-size:0.75rem;color:var(--muted);">members · ₹{{ fees_paid_total }}</div>
+  </div>
+  <div class="panel" style="padding:1rem 1.25rem;border-color:rgba(247,168,27,0.3);">
+    <div style="font-size:0.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;">🟡 Partial</div>
+    <div style="font-size:1.8rem;font-weight:700;color:var(--gold);">{{ fees_partial_count }}</div>
+    <div style="font-size:0.75rem;color:var(--muted);">members</div>
+  </div>
+  <div class="panel" style="padding:1rem 1.25rem;border-color:rgba(239,68,68,0.3);">
+    <div style="font-size:0.75rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem;">🔴 Unpaid</div>
+    <div style="font-size:1.8rem;font-weight:700;color:var(--danger);">{{ fees_unpaid_count }}</div>
+    <div style="font-size:0.75rem;color:var(--muted);">members</div>
+  </div>
+</div>
+
 <!-- Main charts -->
 <div class="charts-grid">
   <div class="panel">

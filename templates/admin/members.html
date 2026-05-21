@@ -30,11 +30,12 @@
   .action-btns { display: flex; align-items: center; gap: 0.4rem; }
 
   /* Stats summary */
-  .summary-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  .summary-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
   .sum-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.75rem; }
   .sum-icon { font-size: 1.4rem; }
   .sum-val { font-size: 1.5rem; font-weight: 700; line-height: 1; }
   .sum-lbl { font-size: 0.75rem; color: var(--muted); }
+  .fees-badge { display: inline-block; padding: 0.18rem 0.55rem; border-radius: 6px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
 </style>
 {% endblock %}
 
@@ -62,6 +63,20 @@
       <div class="sum-lbl">Inactive</div>
     </div>
   </div>
+  <div class="sum-card">
+    <div class="sum-icon">✅</div>
+    <div>
+      <div class="sum-val" style="color:var(--success)">{{ members | selectattr('fees_status', 'eq', 'paid') | list | length }}</div>
+      <div class="sum-lbl">Fees Paid</div>
+    </div>
+  </div>
+  <div class="sum-card">
+    <div class="sum-icon">⚠️</div>
+    <div>
+      <div class="sum-val" style="color:var(--danger)">{{ members | selectattr('fees_status', 'eq', 'unpaid') | list | length }}</div>
+      <div class="sum-lbl">Fees Unpaid</div>
+    </div>
+  </div>
 </div>
 
 <div class="page-header">
@@ -81,6 +96,7 @@
         <th>Phone</th>
         <th>Role</th>
         <th>Points</th>
+        <th>Fees</th>
         <th>Status</th>
         <th>Joined</th>
         <th>Actions</th>
@@ -103,6 +119,16 @@
         <td><span class="role-badge role-{{ m.role }}">{{ m.role | capitalize }}</span></td>
         <td style="font-weight:700;color:var(--blue);">{{ m.total_points }}</td>
         <td>
+          <span class="fees-badge" style="background:{{ m.fees_color }}1a;color:{{ m.fees_color }};">
+            {{ m.fees_status | capitalize }}
+          </span>
+          {% if m.fees_amount > 0 %}
+          <div style="font-size:0.68rem;color:var(--muted);margin-top:0.2rem;">
+            ₹{{ m.fees_paid_amount }}/₹{{ m.fees_amount }}
+          </div>
+          {% endif %}
+        </td>
+        <td>
           {% if m.is_active_member %}
             <span class="status-active">● Active</span>
           {% else %}
@@ -113,6 +139,7 @@
         <td>
           <div class="action-btns">
             <button class="btn btn-ghost btn-sm" onclick="openEdit({{ m.id }}, '{{ m.name }}', '{{ m.position }}', '{{ m.phone or '' }}', '{{ m.role }}', {{ m.is_active_member | lower }})">Edit</button>
+            <button class="btn btn-ghost btn-sm" style="color:var(--gold);" onclick="openFees({{ m.id }}, '{{ m.name }}', '{{ m.fees_status }}', {{ m.fees_amount }}, {{ m.fees_paid_amount }}, '{{ m.fees_paid_date.strftime('%Y-%m-%d') if m.fees_paid_date else '' }}')">💰 Fees</button>
             {% if m.id != current_user.id %}
             <form method="POST" action="/admin/members/{{ m.id }}/delete" onsubmit="return confirm('Delete {{ m.name }}?')">
               <button type="submit" class="btn btn-danger btn-sm">Del</button>
@@ -122,7 +149,7 @@
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem;">No members found. Add your first member.</td></tr>
+      <tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem;">No members found. Add your first member.</td></tr>
       {% endfor %}
     </tbody>
   </table>
@@ -157,20 +184,7 @@
       <div class="form-row">
         <div class="form-group">
           <label>Position</label>
-          <select name="position">
-            <option>Member</option>
-            <option>President</option>
-            <option>Vice President</option>
-            <option>Secretary</option>
-            <option>Treasurer</option>
-            <option>Director - Community Service</option>
-            <option>Director - Projects</option>
-            <option>Director - International Service</option>
-            <option>Director - Vocational Service</option>
-            <option>Sergeant at Arms</option>
-            <option>PR Director</option>
-            <option>Joint Secretary</option>
-          </select>
+          <input type="text" name="position" placeholder="e.g. Director - Technology" value="Member" />
         </div>
         <div class="form-group">
           <label>Role</label>
@@ -207,20 +221,7 @@
       <div class="form-row">
         <div class="form-group">
           <label>Position</label>
-          <select name="position" id="editPosition">
-            <option>Member</option>
-            <option>President</option>
-            <option>Vice President</option>
-            <option>Secretary</option>
-            <option>Treasurer</option>
-            <option>Director - Community Service</option>
-            <option>Director - Projects</option>
-            <option>Director - International Service</option>
-            <option>Director - Vocational Service</option>
-            <option>Sergeant at Arms</option>
-            <option>PR Director</option>
-            <option>Joint Secretary</option>
-          </select>
+          <input type="text" name="position" id="editPosition" placeholder="e.g. Director - Technology" />
         </div>
         <div class="form-group">
           <label>Role</label>
@@ -246,7 +247,54 @@
   </div>
 </div>
 
+
+<!-- Fees Modal -->
+<div class="modal-overlay" id="feesModal">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('feesModal').classList.remove('open')">✕</button>
+    <h3>💰 Update Fees — <span id="feesName"></span></h3>
+    <form method="POST" id="feesForm">
+      <div class="form-group">
+        <label>Fees Status</label>
+        <select name="fees_status" id="feesStatus">
+          <option value="unpaid">Unpaid</option>
+          <option value="partial">Partial</option>
+          <option value="paid">Paid</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Total Amount Due (₹)</label>
+          <input type="number" name="fees_amount" id="feesAmount" min="0" placeholder="0" />
+        </div>
+        <div class="form-group">
+          <label>Amount Paid (₹)</label>
+          <input type="number" name="fees_paid_amount" id="feesPaidAmount" min="0" placeholder="0" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Date of Last Payment</label>
+        <input type="date" name="fees_paid_date" id="feesPaidDate" />
+      </div>
+      <div style="display:flex;gap:0.75rem;justify-content:flex-end;margin-top:0.5rem;">
+        <button type="button" class="btn btn-ghost" onclick="document.getElementById('feesModal').classList.remove('open')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Fees</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
+function openFees(id, name, status, amount, paidAmount, paidDate) {
+  document.getElementById('feesForm').action = `/admin/members/${id}/fees`;
+  document.getElementById('feesName').textContent = name;
+  document.getElementById('feesStatus').value = status;
+  document.getElementById('feesAmount').value = amount;
+  document.getElementById('feesPaidAmount').value = paidAmount;
+  document.getElementById('feesPaidDate').value = paidDate;
+  document.getElementById('feesModal').classList.add('open');
+}
+
 function openEdit(id, name, position, phone, role, isActive) {
   document.getElementById('editForm').action = `/admin/members/${id}/edit`;
   document.getElementById('editName').value = name;

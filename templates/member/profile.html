@@ -70,7 +70,7 @@
     <div class="profile-avatar-wrap">
       <div class="profile-avatar">
         {% if current_user.profile_picture %}
-          <img src="/static/uploads/avatars/{{ current_user.profile_picture }}" alt="avatar" />
+          <img src="{{ current_user.profile_picture }}" alt="avatar" />
         {% else %}
           {{ current_user.initials }}
         {% endif %}

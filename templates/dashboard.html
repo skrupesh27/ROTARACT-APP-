@@ -4,7 +4,7 @@
 
 {% block head %}
 <style>
-  .hero { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+  .hero { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
   .hero-card {
     background: var(--card);
     border: 1px solid var(--border);
@@ -108,6 +108,21 @@
     <div class="val accent-purple">{{ current_user.points_this_month }}</div>
     <div class="lbl">Points This Month</div>
   </div>
+  <div class="hero-card" style="border-color:{{ current_user.fees_color }}44;">
+    <div class="hero-card::before" style="background:{{ current_user.fees_color }};"></div>
+    <div class="icon">💰</div>
+    <div class="val" style="color:{{ current_user.fees_color }};font-size:1.4rem;">
+      {{ current_user.fees_status | capitalize }}
+    </div>
+    {% if current_user.fees_amount > 0 %}
+    <div class="lbl">₹{{ current_user.fees_paid_amount }} / ₹{{ current_user.fees_amount }}</div>
+    {% else %}
+    <div class="lbl">Membership Fees</div>
+    {% endif %}
+    {% if current_user.fees_paid_date %}
+    <div style="font-size:0.68rem;color:var(--muted);margin-top:0.3rem;">Paid: {{ current_user.fees_paid_date.strftime('%d %b %Y') }}</div>
+    {% endif %}
+  </div>
 </div>
 
 <div class="main-grid">
@@ -167,9 +182,10 @@
       {% endif %}
 
       {% for event in upcoming_events %}
-      <div class="event-item">
-        <div class="event-dot" style="background: {{ event.type_color }};"></div>
-        <div>
+      {% set days_left = (event.date.date() - today_date).days %}
+      <a href="/events/{{ event.id }}" class="event-item" style="text-decoration:none;color:inherit;display:flex;align-items:flex-start;gap:0.75rem;padding:0.75rem 0;border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.12s;border-radius:8px;margin:0 -0.5rem;padding-left:0.5rem;">
+        <div class="event-dot" style="background: {{ event.type_color }};margin-top:4px;flex-shrink:0;"></div>
+        <div style="flex:1;">
           <div class="event-title">{{ event.title }}</div>
           <div class="event-meta">
             <span class="event-type-badge" style="background:{{ event.type_color }}22; color:{{ event.type_color }}">{{ event.event_type | capitalize }}</span>
@@ -180,7 +196,12 @@
           <div style="font-size:0.7rem;color:var(--gold);margin-top:0.2rem;">+{{ event.points_for_attendance }} pts for attendance</div>
           {% endif %}
         </div>
-      </div>
+        {% if days_left == 0 %}
+        <span style="font-size:0.65rem;font-weight:700;color:var(--gold);background:rgba(247,168,27,0.12);padding:0.15rem 0.45rem;border-radius:5px;flex-shrink:0;">Today!</span>
+        {% elif days_left > 0 %}
+        <span style="font-size:0.65rem;font-weight:700;color:var(--blue);background:rgba(0,114,206,0.1);padding:0.15rem 0.45rem;border-radius:5px;flex-shrink:0;">{{ days_left }}d</span>
+        {% endif %}
+      </a>
       {% else %}
       <p style="color:var(--muted);font-size:0.85rem;">No upcoming events scheduled.</p>
       {% endfor %}

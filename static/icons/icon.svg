@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#06061a"/>
+  <circle cx="256" cy="256" r="200" fill="#0072CE" opacity="0.15"/>
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#0072CE" stroke-width="16"/>
+  <circle cx="256" cy="256" r="40" fill="#0072CE"/>
+  <line x1="256" y1="96" x2="256" y2="216" stroke="#0072CE" stroke-width="14" stroke-linecap="round"/>
+  <line x1="256" y1="296" x2="256" y2="416" stroke="#0072CE" stroke-width="14" stroke-linecap="round"/>
+  <line x1="96" y1="256" x2="216" y2="256" stroke="#0072CE" stroke-width="14" stroke-linecap="round"/>
+  <line x1="296" y1="256" x2="416" y2="256" stroke="#0072CE" stroke-width="14" stroke-linecap="round"/>
+  <line x1="143" y1="143" x2="227" y2="227" stroke="#F7A81B" stroke-width="10" stroke-linecap="round"/>
+  <line x1="285" y1="285" x2="369" y2="369" stroke="#F7A81B" stroke-width="10" stroke-linecap="round"/>
+  <line x1="369" y1="143" x2="285" y2="227" stroke="#F7A81B" stroke-width="10" stroke-linecap="round"/>
+  <line x1="227" y1="285" x2="143" y2="369" stroke="#F7A81B" stroke-width="10" stroke-linecap="round"/>
+  <text x="256" y="276" text-anchor="middle" font-family="Arial,sans-serif" font-size="52" font-weight="900" fill="#ffffff" letter-spacing="-2">RA</text>
+</svg>

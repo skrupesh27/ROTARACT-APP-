@@ -70,7 +70,7 @@
         <div class="req-header">
           <div class="req-av" style="background: hsl({{ loop.index * 50 }}, 55%, 30%);">
             {% if req.member.profile_picture %}
-              <img src="/static/uploads/avatars/{{ req.member.profile_picture }}" alt="{{ req.member.initials }}" />
+              <img src="{{ req.member.profile_picture }}" alt="{{ req.member.initials }}" />
             {% else %}
               {{ req.member.initials }}
             {% endif %}
@@ -127,7 +127,7 @@
         <div class="req-header">
           <div class="req-av" style="background: hsl({{ loop.index * 55 }}, 50%, 30%);">
             {% if req.member.profile_picture %}
-              <img src="/static/uploads/avatars/{{ req.member.profile_picture }}" alt="{{ req.member.initials }}" />
+              <img src="{{ req.member.profile_picture }}" alt="{{ req.member.initials }}" />
             {% else %}
               {{ req.member.initials }}
             {% endif %}

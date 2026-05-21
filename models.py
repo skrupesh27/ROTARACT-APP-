@@ -1,3 +1,5 @@
+import json as _json
+import os
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -18,6 +20,12 @@ class User(db.Model, UserMixin):
     joined_date = db.Column(db.Date, default=date.today)
     is_active_member = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Fees tracking
+    fees_status = db.Column(db.String(20), default='unpaid')   # unpaid / partial / paid
+    fees_amount = db.Column(db.Integer, default=0)             # total amount due
+    fees_paid_amount = db.Column(db.Integer, default=0)        # amount paid so far
+    fees_paid_date = db.Column(db.Date)                        # date of last payment
 
     point_entries = db.relationship(
         'PointEntry', foreign_keys='PointEntry.member_id',
@@ -69,6 +77,10 @@ class User(db.Model, UserMixin):
             .filter(PointEntry.member_id == self.id)\
             .group_by(Metric.id).all()
         return [{'name': r[0], 'color': r[1], 'points': r[2] or 0} for r in results]
+
+    @property
+    def fees_color(self):
+        return {'paid': '#10b981', 'partial': '#F7A81B', 'unpaid': '#ef4444'}.get(self.fees_status, '#6b7280')
 
     @property
     def avatar_url(self):
@@ -133,6 +145,12 @@ class Event(db.Model):
                                   cascade='all, delete-orphan')
     event_absence_requests = db.relationship('AbsenceRequest', backref='event',
                                              lazy='dynamic', cascade='all, delete-orphan')
+    messages = db.relationship('EventMessage', backref='event', lazy='dynamic',
+                               cascade='all, delete-orphan')
+    polls = db.relationship('EventPoll', backref='event', lazy='dynamic',
+                            cascade='all, delete-orphan')
+    minutes_list = db.relationship('EventMinutes', backref='event', lazy='dynamic',
+                                   cascade='all, delete-orphan')
 
     @property
     def attendance_count(self):
@@ -207,3 +225,176 @@ class PointDispute(db.Model):
 
     def __repr__(self):
         return f'<PointDispute member={self.member_id} status={self.status}>'
+
+
+class PushSubscription(db.Model):
+    """Stores Web Push API subscriptions per user device."""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    endpoint = db.Column(db.Text, nullable=False, unique=True)
+    p256dh = db.Column(db.Text, nullable=False)   # public key
+    auth = db.Column(db.Text, nullable=False)       # auth secret
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', backref=db.backref('push_subscriptions', lazy='dynamic'))
+
+    def to_dict(self):
+        return {
+            'endpoint': self.endpoint,
+            'keys': {'p256dh': self.p256dh, 'auth': self.auth},
+        }
+
+    def __repr__(self):
+        return f'<PushSubscription user={self.user_id}>'
+
+
+class EventMessage(db.Model):
+    """Chat message in an event discussion."""
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    msg_type = db.Column(db.String(20), default='text')  # text / image / location
+    image_path = db.Column(db.String(200))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', foreign_keys=[user_id])
+
+    def __repr__(self):
+        return f'<EventMessage event={self.event_id} user={self.user_id}>'
+
+
+class EventPoll(db.Model):
+    """Admin-created poll for an event."""
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False)
+    question = db.Column(db.String(500), nullable=False)
+    options_json = db.Column(db.Text, nullable=False)   # JSON list of strings
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    poll_votes = db.relationship('EventPollVote', backref='poll', lazy='dynamic',
+                                 cascade='all, delete-orphan')
+
+    @property
+    def options(self):
+        return _json.loads(self.options_json)
+
+    def vote_counts(self):
+        counts = [0] * len(self.options)
+        for v in self.poll_votes.all():
+            if 0 <= v.option_index < len(counts):
+                counts[v.option_index] += 1
+        return counts
+
+    def total_votes(self):
+        return self.poll_votes.count()
+
+    def user_vote(self, user_id):
+        v = self.poll_votes.filter_by(user_id=user_id).first()
+        return v.option_index if v else None
+
+    def __repr__(self):
+        return f'<EventPoll event={self.event_id}>'
+
+
+class EventPollVote(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    poll_id = db.Column(db.Integer, db.ForeignKey('event_poll.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    option_index = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    user = db.relationship('User', foreign_keys=[user_id])
+
+    def __repr__(self):
+        return f'<EventPollVote poll={self.poll_id} user={self.user_id}>'
+
+
+class EventMinutes(db.Model):
+    """Minutes of meeting or project report."""
+    id = db.Column(db.Integer, primary_key=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text)
+    file_path = db.Column(db.String(200))
+    file_original_name = db.Column(db.String(200))
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+
+    @property
+    def file_ext(self):
+        if self.file_original_name and '.' in self.file_original_name:
+            return self.file_original_name.rsplit('.', 1)[-1].lower()
+        return ''
+
+    @property
+    def file_icon(self):
+        return {'pdf': '📄', 'doc': '📝', 'docx': '📝', 'xls': '📊',
+                'xlsx': '📊', 'ppt': '📑', 'pptx': '📑', 'txt': '📋'}.get(self.file_ext, '📎')
+
+    def __repr__(self):
+        return f'<EventMinutes event={self.event_id}>'
+
+
+class DocumentFolder(db.Model):
+    """Folder that holds club documents."""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.String(400))
+    created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    created_by = db.relationship('User', foreign_keys=[created_by_id])
+    documents = db.relationship('ClubDocument', backref='folder', lazy='dynamic',
+                                cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f'<DocumentFolder {self.name}>'
+
+
+class ClubDocument(db.Model):
+    """A file uploaded to a club document folder."""
+    id = db.Column(db.Integer, primary_key=True)
+    folder_id = db.Column(db.Integer, db.ForeignKey('document_folder.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    file_path = db.Column(db.String(300), nullable=False)       # path under static/uploads/documents/
+    file_original_name = db.Column(db.String(300), nullable=False)
+    uploaded_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    uploaded_by = db.relationship('User', foreign_keys=[uploaded_by_id])
+
+    @property
+    def file_ext(self):
+        if '.' in self.file_original_name:
+            return self.file_original_name.rsplit('.', 1)[-1].lower()
+        return ''
+
+    @property
+    def file_icon(self):
+        icons = {
+            'pdf': '📄', 'doc': '📝', 'docx': '📝',
+            'xls': '📊', 'xlsx': '📊',
+            'ppt': '📑', 'pptx': '📑',
+            'txt': '📋', 'csv': '📋',
+            'png': '🖼️', 'jpg': '🖼️', 'jpeg': '🖼️', 'gif': '🖼️',
+            'zip': '🗜️', 'rar': '🗜️',
+        }
+        return icons.get(self.file_ext, '📎')
+
+    @property
+    def file_size_kb(self):
+        try:
+            from flask import current_app
+            full = os.path.join(current_app.static_folder, 'uploads', 'documents', self.file_path)
+            return round(os.path.getsize(full) / 1024, 1)
+        except Exception:
+            return 0
+
+    def __repr__(self):
+        return f'<ClubDocument {self.title}>'

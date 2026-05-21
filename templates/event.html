@@ -1,0 +1,517 @@
+{% extends "base.html" %}
+{% block title %}{{ event.title }} — Rotaract{% endblock %}
+{% block page_title %}{{ event.title }}{% endblock %}
+
+{% block head %}
+<style>
+  .back-link { display:inline-flex;align-items:center;gap:0.4rem;color:var(--muted);font-size:0.85rem;text-decoration:none;margin-bottom:1.25rem;transition:color 0.15s; }
+  .back-link:hover { color:var(--text); }
+
+  /* ── Event Hero ── */
+  .event-hero { background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin-bottom:1.5rem;display:grid;grid-template-columns:1fr auto;gap:1.5rem;align-items:start; }
+  .event-type-chip { display:inline-flex;align-items:center;padding:0.25rem 0.65rem;border-radius:6px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.5rem; }
+  .event-hero h1 { font-size:1.4rem;font-weight:800;margin-bottom:0.4rem; }
+  .event-meta-row { display:flex;gap:1.25rem;flex-wrap:wrap;margin-top:0.65rem; }
+  .event-meta-item { display:flex;align-items:center;gap:0.35rem;font-size:0.82rem;color:var(--muted); }
+
+  /* Days left box */
+  .days-left-box { text-align:center;border-radius:12px;padding:1rem 1.25rem;min-width:120px;border:1px solid; }
+  .days-left-box .dl-num { font-size:2.2rem;font-weight:800;line-height:1; }
+  .days-left-box .dl-lbl { font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-top:0.2rem; }
+  .days-future { background:rgba(0,114,206,0.08);border-color:rgba(0,114,206,0.25);color:var(--blue); }
+  .days-today { background:rgba(247,168,27,0.1);border-color:rgba(247,168,27,0.3);color:var(--gold);animation:pulse 2s infinite; }
+  .days-past { background:rgba(255,255,255,0.03);border-color:var(--border);color:var(--muted); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.7} }
+
+  /* ── Admin action bar ── */
+  .admin-bar { display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1.5rem;padding:1rem 1.25rem;background:rgba(247,168,27,0.05);border:1px solid rgba(247,168,27,0.15);border-radius:10px; }
+  .admin-bar-label { font-size:0.72rem;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.08em;margin-right:0.25rem; }
+
+  /* ── 2-col layout ── */
+  .event-cols { display:grid;grid-template-columns:1fr 360px;gap:1.25rem;align-items:start; }
+
+  /* ── Chat ── */
+  .chat-panel { background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden; }
+  .chat-header { padding:1rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between; }
+  .chat-header h2 { font-size:0.95rem;font-weight:700; }
+  .chat-messages { padding:0.75rem 1rem;max-height:520px;overflow-y:auto;display:flex;flex-direction:column;gap:0.75rem; }
+  .chat-messages:empty::after { content:'No messages yet. Start the discussion!';color:var(--muted);font-size:0.85rem;padding:2rem;text-align:center; }
+
+  .msg { display:flex;gap:0.65rem;align-items:flex-start; }
+  .msg.mine { flex-direction:row-reverse; }
+  .msg-av { width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;flex-shrink:0;overflow:hidden; }
+  .msg-av img { width:100%;height:100%;object-fit:cover; }
+  .msg-body { max-width:72%; }
+  .msg-meta { font-size:0.68rem;color:var(--muted);margin-bottom:0.2rem; }
+  .msg.mine .msg-meta { text-align:right; }
+  .msg-bubble { background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:12px;padding:0.6rem 0.85rem;font-size:0.875rem;line-height:1.5;word-break:break-word; }
+  .msg.mine .msg-bubble { background:rgba(0,114,206,0.12);border-color:rgba(0,114,206,0.2); }
+  .msg-bubble.location-msg { color:var(--blue);font-size:0.82rem; }
+  .msg-bubble.location-msg a { color:var(--blue);text-decoration:underline; }
+  .msg-image { max-width:240px;border-radius:8px;display:block;margin-top:0.3rem; }
+
+  .chat-form-area { padding:1rem 1.25rem;border-top:1px solid var(--border);background:rgba(255,255,255,0.01); }
+  .chat-input-row { display:flex;gap:0.5rem;align-items:flex-end; }
+  .chat-textarea { flex:1;background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:8px;padding:0.6rem 0.85rem;color:var(--text);font-size:0.875rem;font-family:'Inter',sans-serif;outline:none;resize:none;transition:border-color 0.2s; }
+  .chat-textarea:focus { border-color:var(--blue); }
+  .chat-tools { display:flex;gap:0.4rem;margin-top:0.5rem;flex-wrap:wrap; }
+  .tool-btn { background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);padding:0.3rem 0.65rem;font-size:0.75rem;cursor:pointer;transition:all 0.15s; }
+  .tool-btn:hover { border-color:var(--blue);color:var(--blue); }
+  .tool-panel { display:none;margin-top:0.75rem;padding:0.75rem;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:8px; }
+  .tool-panel.open { display:block; }
+
+  /* ── Right column ── */
+  .right-col { display:flex;flex-direction:column;gap:1rem; }
+  .side-panel { background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden; }
+  .sp-head { padding:0.85rem 1.25rem;border-bottom:1px solid var(--border);font-size:0.9rem;font-weight:700;display:flex;align-items:center;justify-content:space-between; }
+  .sp-body { padding:1rem 1.25rem; }
+
+  /* ── Polls ── */
+  .poll-card { padding:0.85rem 0;border-bottom:1px solid rgba(255,255,255,0.04); }
+  .poll-card:last-child { border-bottom:none; }
+  .poll-question { font-size:0.875rem;font-weight:600;margin-bottom:0.75rem; }
+  .poll-option { margin-bottom:0.5rem; }
+  .poll-bar-row { display:flex;align-items:center;gap:0.65rem;margin-bottom:0.15rem; }
+  .poll-label { font-size:0.8rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .poll-pct { font-size:0.75rem;font-weight:700;color:var(--blue);width:32px;text-align:right;flex-shrink:0; }
+  .poll-bar-wrap { height:6px;background:rgba(255,255,255,0.06);border-radius:99px;overflow:hidden; }
+  .poll-bar { height:6px;border-radius:99px;background:var(--blue);transition:width 0.4s; }
+  .poll-bar.my-pick { background:var(--gold); }
+  .poll-meta { font-size:0.68rem;color:var(--muted);margin-top:0.5rem; }
+  .vote-btns { display:flex;flex-direction:column;gap:0.35rem; }
+  .vote-btn { background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:7px;padding:0.4rem 0.75rem;color:var(--text);font-size:0.82rem;cursor:pointer;text-align:left;transition:all 0.15s; }
+  .vote-btn:hover { border-color:var(--blue);color:var(--blue); }
+
+  /* ── Minutes ── */
+  .minutes-item { display:flex;align-items:flex-start;gap:0.65rem;padding:0.75rem 0;border-bottom:1px solid rgba(255,255,255,0.04); }
+  .minutes-item:last-child { border-bottom:none; }
+  .min-icon { font-size:1.4rem;flex-shrink:0;margin-top:0.1rem; }
+  .min-info { flex:1;min-width:0; }
+  .min-title { font-size:0.875rem;font-weight:600;margin-bottom:0.2rem; }
+  .min-content { font-size:0.78rem;color:var(--muted);line-height:1.5;margin-bottom:0.35rem;white-space:pre-wrap; }
+  .min-meta { font-size:0.68rem;color:var(--muted); }
+
+  /* ── Create poll form ── */
+  .poll-opt-row { display:flex;gap:0.4rem;margin-bottom:0.4rem; }
+  .poll-opt-row input { flex:1; }
+  .poll-opt-row button { padding:0.4rem 0.65rem;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;font-size:0.8rem; }
+  .poll-opt-row button:hover { color:var(--danger); }
+
+  @media(max-width:900px) {
+    .event-cols { grid-template-columns:1fr; }
+    .event-hero { grid-template-columns:1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{% if current_user.role == 'admin' %}
+<a href="/admin/events" class="back-link">← Back to Events</a>
+{% else %}
+<a href="/dashboard" class="back-link">← Back to Dashboard</a>
+{% endif %}
+
+<!-- Event Hero -->
+<div class="event-hero">
+  <div>
+    <div class="event-type-chip" style="background:{{ event.type_color }}22;color:{{ event.type_color }};">
+      {{ event.event_type | capitalize }}
+    </div>
+    <h1>{{ event.title }}</h1>
+    {% if event.description %}
+    <p style="color:var(--muted);font-size:0.85rem;margin-bottom:0.4rem;">{{ event.description }}</p>
+    {% endif %}
+    <div class="event-meta-row">
+      <div class="event-meta-item">🕐 {{ event.date.strftime('%A, %d %B %Y — %I:%M %p') }}</div>
+      {% if event.end_date %}<div class="event-meta-item">→ {{ event.end_date.strftime('%I:%M %p') }}</div>{% endif %}
+      {% if event.location %}<div class="event-meta-item">📍 {{ event.location }}</div>{% endif %}
+      {% if event.points_for_attendance > 0 %}<div class="event-meta-item" style="color:var(--gold);">⭐ +{{ event.points_for_attendance }} pts for attending</div>{% endif %}
+    </div>
+  </div>
+  <!-- Days Left Countdown -->
+  <div>
+    {% if days_left > 1 %}
+    <div class="days-left-box days-future">
+      <div class="dl-num">{{ days_left }}</div>
+      <div class="dl-lbl">Days Left</div>
+    </div>
+    {% elif days_left == 1 %}
+    <div class="days-left-box days-future">
+      <div class="dl-num">1</div>
+      <div class="dl-lbl">Day Left</div>
+    </div>
+    {% elif days_left == 0 %}
+    <div class="days-left-box days-today">
+      <div class="dl-num">🔥</div>
+      <div class="dl-lbl">Today!</div>
+    </div>
+    {% else %}
+    <div class="days-left-box days-past">
+      <div class="dl-num">✓</div>
+      <div class="dl-lbl">Completed</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Admin Action Bar -->
+{% if current_user.role == 'admin' %}
+<div class="admin-bar">
+  <span class="admin-bar-label">Admin Tools</span>
+  <a href="/admin/events/{{ event.id }}" class="btn btn-gold btn-sm">✅ Manage Attendance</a>
+  <button class="btn btn-ghost btn-sm" onclick="togglePanel('poll-form')">📊 Create Poll</button>
+  <button class="btn btn-ghost btn-sm" onclick="togglePanel('minutes-form')">📋 Add Minutes / Report</button>
+  <button class="btn btn-ghost btn-sm" onclick="togglePanel('location-form')">📍 Share Location</button>
+</div>
+{% endif %}
+
+<!-- Main Content -->
+<div class="event-cols">
+
+  <!-- LEFT: Chat -->
+  <div class="chat-panel" id="chat">
+    <div class="chat-header">
+      <h2>💬 Discussion</h2>
+      <span style="font-size:0.75rem;color:var(--muted);">{{ messages | length }} message{{ 's' if messages | length != 1 }}</span>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      {% for msg in messages %}
+      {% set is_mine = msg.user_id == current_user.id %}
+      <div class="msg {% if is_mine %}mine{% endif %}" id="msg-{{ msg.id }}">
+        <div class="msg-av" style="background:hsl({{ msg.user_id * 47 }},55%,30%);">
+          {% if msg.user.profile_picture %}
+            <img src="{{ msg.user.profile_picture }}" alt="" />
+          {% else %}
+            {{ msg.user.initials }}
+          {% endif %}
+        </div>
+        <div class="msg-body">
+          <div class="msg-meta">
+            {{ msg.user.name.split()[0] }}
+            {% if msg.user.role == 'admin' %}<span style="color:var(--gold);font-size:0.62rem;"> Admin</span>{% endif %}
+            · {{ msg.created_at.strftime('%d %b, %I:%M %p') }}
+          </div>
+          {% if msg.msg_type == 'image' %}
+          <div class="msg-bubble">
+            <a href="{{ msg.image_path }}" target="_blank">
+              <img src="{{ msg.image_path }}" alt="image" class="msg-image" />
+            </a>
+            {% if msg.content %}<div style="margin-top:0.35rem;font-size:0.82rem;color:var(--muted);">{{ msg.content }}</div>{% endif %}
+          </div>
+          {% elif msg.msg_type == 'location' %}
+          <div class="msg-bubble location-msg">
+            📍 <a href="{{ msg.content }}" target="_blank" rel="noopener">{{ msg.image_path or 'View Location' }}</a>
+          </div>
+          {% else %}
+          <div class="msg-bubble">{{ msg.content }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <div id="chat-bottom"></div>
+
+    <!-- Chat Input -->
+    <div class="chat-form-area">
+      <form method="POST" action="/events/{{ event.id }}/chat" enctype="multipart/form-data" id="chatForm">
+        <input type="hidden" name="msg_type" id="msgType" value="text" />
+        <div class="chat-input-row">
+          <textarea name="content" class="chat-textarea" id="chatInput" rows="2" placeholder="Write a message…" onkeydown="chatEnter(event)"></textarea>
+          <button type="submit" class="btn btn-primary btn-sm" style="height:fit-content;">Send</button>
+        </div>
+        <div class="chat-tools">
+          <button type="button" class="tool-btn" onclick="toggleTool('imgTool','image')">📷 Image</button>
+          {% if current_user.role == 'admin' %}
+          <button type="button" class="tool-btn" onclick="toggleTool('locTool','location')">📍 Location</button>
+          {% endif %}
+        </div>
+        <!-- Image tool -->
+        <div class="tool-panel" id="imgTool">
+          <label style="font-size:0.75rem;color:var(--muted);margin-bottom:0.35rem;display:block;">Select image to share</label>
+          <input type="file" name="image" accept="image/*" style="font-size:0.82rem;" />
+        </div>
+        <!-- Location tool (admin) -->
+        <div class="tool-panel" id="locTool">
+          <div class="form-group" style="margin-bottom:0.5rem;">
+            <label>Location URL (Google Maps link)</label>
+            <input type="text" name="location_url" placeholder="https://maps.google.com/..." />
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Label</label>
+            <input type="text" name="content" placeholder="e.g. Meeting venue" />
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- RIGHT: Polls + Minutes -->
+  <div class="right-col">
+
+    <!-- ── Polls ── -->
+    <div class="side-panel" id="polls">
+      <div class="sp-head">
+        📊 Polls
+        <span style="font-size:0.72rem;color:var(--muted);">{{ poll_data | length }}</span>
+      </div>
+      <div class="sp-body" style="padding-top:0.5rem;">
+
+        <!-- Create Poll Form (admin) -->
+        {% if current_user.role == 'admin' %}
+        <div class="tool-panel" id="poll-form" style="margin-bottom:1rem;">
+          <form method="POST" action="/admin/events/{{ event.id }}/poll">
+            <div class="form-group">
+              <label>Poll Question *</label>
+              <input type="text" name="question" placeholder="e.g. Will you attend this event?" required />
+            </div>
+            <label style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;">Options (min 2) *</label>
+            <div id="optionsList" style="margin-top:0.4rem;">
+              <div class="poll-opt-row">
+                <input type="text" name="options" placeholder="Option 1" required />
+                <button type="button" onclick="removeOpt(this)" style="display:none">✕</button>
+              </div>
+              <div class="poll-opt-row">
+                <input type="text" name="options" placeholder="Option 2" required />
+                <button type="button" onclick="removeOpt(this)" style="display:none">✕</button>
+              </div>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" style="margin-top:0.4rem;width:100%;" onclick="addOpt()">+ Add Option</button>
+            <div style="display:flex;gap:0.5rem;margin-top:0.75rem;">
+              <button type="submit" class="btn btn-primary btn-sm" style="flex:1;">Create Poll</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="togglePanel('poll-form')">Cancel</button>
+            </div>
+          </form>
+        </div>
+        {% endif %}
+
+        {% if poll_data %}
+          {% for pd in poll_data %}
+          <div class="poll-card">
+            <div class="poll-question">{{ pd.poll.question }}</div>
+
+            {% if pd.my_vote is not none %}
+              <!-- Already voted: show results -->
+              {% for opt in pd.options %}
+              <div class="poll-option">
+                <div class="poll-bar-row">
+                  <span class="poll-label">
+                    {% if loop.index0 == pd.my_vote %}✓ {% endif %}{{ opt.label }}
+                  </span>
+                  <span class="poll-pct">{{ opt.pct }}%</span>
+                </div>
+                <div class="poll-bar-wrap">
+                  <div class="poll-bar {% if loop.index0 == pd.my_vote %}my-pick{% endif %}"
+                       style="width:{{ opt.pct }}%;"></div>
+                </div>
+              </div>
+              {% endfor %}
+              <div class="poll-meta">{{ pd.total }} vote{{ 's' if pd.total != 1 }} · Your choice highlighted in gold</div>
+
+            {% else %}
+              <!-- Hasn't voted yet -->
+              <form method="POST" action="/events/{{ event.id }}/poll/{{ pd.poll.id }}/vote">
+                <div class="vote-btns">
+                  {% for opt in pd.options %}
+                  <button type="submit" name="option" value="{{ loop.index0 }}" class="vote-btn">
+                    {{ opt.label }}
+                  </button>
+                  {% endfor %}
+                </div>
+                <div class="poll-meta" style="margin-top:0.5rem;">{{ pd.total }} vote{{ 's' if pd.total != 1 }} · Tap to vote</div>
+              </form>
+            {% endif %}
+
+            {% if current_user.role == 'admin' %}
+            <form method="POST" action="/admin/events/{{ event.id }}/poll/{{ pd.poll.id }}/delete"
+                  onsubmit="return confirm('Delete this poll?')" style="margin-top:0.5rem;">
+              <button type="submit" class="btn btn-danger btn-sm" style="font-size:0.7rem;">Delete Poll</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endfor %}
+        {% else %}
+        <p style="color:var(--muted);font-size:0.82rem;padding:0.5rem 0;">
+          No polls yet.{% if current_user.role == 'admin' %} Click "Create Poll" above to add one.{% endif %}
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ── Minutes / Reports ── -->
+    <div class="side-panel" id="minutes">
+      <div class="sp-head">
+        📋 Minutes &amp; Reports
+        <span style="font-size:0.72rem;color:var(--muted);">{{ mins | length }}</span>
+      </div>
+      <div class="sp-body" style="padding-top:0.5rem;">
+
+        <!-- Add Minutes Form (admin) -->
+        {% if current_user.role == 'admin' %}
+        <div class="tool-panel" id="minutes-form" style="margin-bottom:1rem;">
+          <form method="POST" action="/admin/events/{{ event.id }}/minutes" enctype="multipart/form-data">
+            <div class="form-group">
+              <label>Title *</label>
+              <input type="text" name="title" placeholder="e.g. Meeting Minutes — March 2026" required />
+            </div>
+            <div class="form-group">
+              <label>Text Content (optional)</label>
+              <textarea name="content" rows="5" placeholder="Paste or type the minutes/report text here…"></textarea>
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+              <label>Upload File (PDF / Word / Excel / PPT) (optional)</label>
+              <input type="file" name="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" style="font-size:0.82rem;" />
+            </div>
+            <div style="display:flex;gap:0.5rem;margin-top:0.75rem;">
+              <button type="submit" class="btn btn-primary btn-sm" style="flex:1;">Save</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="togglePanel('minutes-form')">Cancel</button>
+            </div>
+          </form>
+        </div>
+        {% endif %}
+
+        {% if mins %}
+          {% for m in mins %}
+          <div class="minutes-item">
+            <div class="min-icon">{{ m.file_icon if m.file_path else '📋' }}</div>
+            <div class="min-info">
+              <div class="min-title">{{ m.title }}</div>
+              {% if m.content %}
+              <div class="min-content">{{ m.content[:300] }}{% if m.content | length > 300 %}…{% endif %}</div>
+              {% endif %}
+              {% if m.file_path %}
+              <a href="{{ m.file_path }}" target="_blank"
+                 class="btn btn-ghost btn-sm" style="font-size:0.72rem;margin-top:0.35rem;">
+                ⬇ Download {{ m.file_original_name }}
+              </a>
+              {% endif %}
+              <div class="min-meta">
+                Added by {{ m.created_by.name.split()[0] }} · {{ m.created_at.strftime('%d %b %Y') }}
+              </div>
+            </div>
+            {% if current_user.role == 'admin' %}
+            <form method="POST" action="/admin/events/{{ event.id }}/minutes/{{ m.id }}/delete"
+                  onsubmit="return confirm('Delete this entry?')" style="flex-shrink:0;">
+              <button type="submit" class="btn btn-danger btn-sm" style="font-size:0.68rem;">Del</button>
+            </form>
+            {% endif %}
+          </div>
+          {% endfor %}
+        {% else %}
+        <p style="color:var(--muted);font-size:0.82rem;padding:0.5rem 0;">
+          No minutes or reports yet.{% if current_user.role == 'admin' %} Click "Add Minutes" above.{% endif %}
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Absence request (members) -->
+    {% if current_user.role != 'admin' and days_left >= 0 %}
+    <div class="side-panel">
+      <div class="sp-head">🙋 Absence Request</div>
+      <div class="sp-body">
+        {% if my_absence %}
+          <div style="font-size:0.82rem;margin-bottom:0.5rem;">
+            Status:
+            <span style="font-weight:700;color:{{ my_absence.status_color }};">{{ my_absence.status | capitalize }}</span>
+          </div>
+          <div style="font-size:0.78rem;color:var(--muted);">"{{ my_absence.reason }}"</div>
+          {% if my_absence.admin_note %}
+          <div style="font-size:0.75rem;color:var(--muted);margin-top:0.4rem;">Admin note: {{ my_absence.admin_note }}</div>
+          {% endif %}
+        {% else %}
+          <p style="font-size:0.8rem;color:var(--muted);margin-bottom:0.75rem;">Can't make it? Submit an absence request.</p>
+          <form method="POST" action="/absence/request">
+            <input type="hidden" name="event_id" value="{{ event.id }}" />
+            <div class="form-group" style="margin-bottom:0.75rem;">
+              <label>Reason</label>
+              <textarea name="reason" rows="3" placeholder="Brief reason for absence…" required></textarea>
+            </div>
+            <button type="submit" class="btn btn-ghost btn-sm" style="width:100%;">Submit Request</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Location pin (admin shared) -->
+    {% if current_user.role == 'admin' %}
+    <div class="tool-panel" id="location-form" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem;">
+      <h3 style="font-size:0.9rem;font-weight:700;margin-bottom:0.75rem;">📍 Share Location in Chat</h3>
+      <form method="POST" action="/events/{{ event.id }}/chat">
+        <input type="hidden" name="msg_type" value="location" />
+        <div class="form-group">
+          <label>Google Maps / Location URL *</label>
+          <input type="text" name="location_url" placeholder="https://maps.app.goo.gl/…" required />
+        </div>
+        <div class="form-group" style="margin-bottom:0.75rem;">
+          <label>Label</label>
+          <input type="text" name="content" placeholder="e.g. Event Venue — Hotel Grand" />
+        </div>
+        <div style="display:flex;gap:0.5rem;">
+          <button type="submit" class="btn btn-primary btn-sm" style="flex:1;">Post Location</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="togglePanel('location-form')">Cancel</button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<script>
+// Auto-scroll chat to bottom on load
+const chatBox = document.getElementById('chatMessages');
+if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+
+// Send on Ctrl+Enter
+function chatEnter(e) {
+  if (e.key === 'Enter' && e.ctrlKey) {
+    e.preventDefault();
+    document.getElementById('chatForm').submit();
+  }
+}
+
+// Toggle inline tool panels
+function togglePanel(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+}
+
+// Toggle chat tool row
+function toggleTool(panelId, type) {
+  const panel = document.getElementById(panelId);
+  const allPanels = document.querySelectorAll('.tool-panel');
+  const isOpen = panel.classList.contains('open');
+  allPanels.forEach(p => p.classList.remove('open'));
+  if (!isOpen) {
+    panel.classList.add('open');
+    document.getElementById('msgType').value = type;
+  } else {
+    document.getElementById('msgType').value = 'text';
+  }
+}
+
+// Poll option add/remove
+function addOpt() {
+  const list = document.getElementById('optionsList');
+  const row = document.createElement('div');
+  row.className = 'poll-opt-row';
+  row.innerHTML = `<input type="text" name="options" placeholder="Option ${list.children.length + 1}" />
+    <button type="button" onclick="removeOpt(this)">✕</button>`;
+  list.appendChild(row);
+  updateRemoveBtns();
+}
+function removeOpt(btn) {
+  btn.closest('.poll-opt-row').remove();
+  updateRemoveBtns();
+}
+function updateRemoveBtns() {
+  const rows = document.querySelectorAll('.poll-opt-row');
+  rows.forEach((r, i) => {
+    r.querySelector('button').style.display = rows.length > 2 ? '' : 'none';
+  });
+}
+</script>
+{% endblock %}

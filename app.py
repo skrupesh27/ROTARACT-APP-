@@ -13,11 +13,109 @@ from flask_login import (
 )
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
+try:
+    import cloudinary
+    import cloudinary.uploader
+    _CLOUDINARY_AVAILABLE = True
+except ImportError:
+    _CLOUDINARY_AVAILABLE = False
 
-from models import db, User, Metric, PointEntry, Event, EventAttendance, AbsenceRequest, PointDispute
+from models import (db, User, Metric, PointEntry, Event, EventAttendance,
+                    AbsenceRequest, PointDispute, PushSubscription,
+                    EventMessage, EventPoll, EventPollVote, EventMinutes,
+                    DocumentFolder, ClubDocument)
 from google_calendar import get_upcoming_events, sync_event_to_calendar, is_calendar_connected
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+
+# ─── Cloudinary (file storage for Railway/production) ────────────────────────
+if _CLOUDINARY_AVAILABLE and os.environ.get('CLOUDINARY_CLOUD_NAME'):
+    cloudinary.config(
+        cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
+        api_key=os.environ.get('CLOUDINARY_API_KEY'),
+        api_secret=os.environ.get('CLOUDINARY_API_SECRET'),
+    )
+
+def upload_to_cloudinary(file, folder, public_id=None, resource_type='auto'):
+    """Upload to Cloudinary in production, or save locally in dev."""
+    if _CLOUDINARY_AVAILABLE and os.environ.get('CLOUDINARY_CLOUD_NAME'):
+        try:
+            kwargs = {'folder': folder, 'resource_type': resource_type}
+            if public_id:
+                kwargs['public_id'] = public_id
+                kwargs['overwrite'] = True
+            result = cloudinary.uploader.upload(file, **kwargs)
+            return result.get('secure_url')
+        except Exception as e:
+            print(f'Cloudinary upload error: {e}')
+            return None
+    # Local fallback: save to static/uploads
+    local_folder = os.path.join(BASE_DIR, 'static', 'uploads', folder.split('/')[-1])
+    os.makedirs(local_folder, exist_ok=True)
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else 'bin'
+    fname = (f"{public_id}.{ext}" if public_id
+             else f"{int(datetime.utcnow().timestamp())}_{secure_filename(file.filename)}")
+    file.save(os.path.join(local_folder, fname))
+    return f"/static/uploads/{folder.split('/')[-1]}/{fname}"
+
+def delete_from_cloudinary(public_id, resource_type='image'):
+    if _CLOUDINARY_AVAILABLE and os.environ.get('CLOUDINARY_CLOUD_NAME'):
+        try:
+            cloudinary.uploader.destroy(public_id, resource_type=resource_type)
+        except Exception as e:
+            print(f'Cloudinary delete error: {e}')
+
+# ─── Push Notifications (pywebpush) ──────────────────────────────────────────
+try:
+    from pywebpush import webpush, WebPushException
+    _PUSH_AVAILABLE = True
+except ImportError:
+    _PUSH_AVAILABLE = False
+
+VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
+VAPID_PUBLIC_KEY  = os.environ.get('VAPID_PUBLIC_KEY', '')
+VAPID_CLAIMS      = {'sub': 'mailto:admin@rotaract-palghar.org'}
+
+
+def _send_push(subscription_dict, title, body, url='/'):
+    """Send a single push notification. Returns True on success."""
+    if not _PUSH_AVAILABLE or not VAPID_PRIVATE_KEY:
+        return False
+    try:
+        webpush(
+            subscription_info=subscription_dict,
+            data=json.dumps({'title': title, 'body': body, 'url': url,
+                             'tag': 'rotaract-' + url.replace('/', '-')}),
+            vapid_private_key=VAPID_PRIVATE_KEY,
+            vapid_claims=VAPID_CLAIMS,
+        )
+        return True
+    except WebPushException as ex:
+        if ex.response and ex.response.status_code in (404, 410):
+            # Subscription expired — remove it
+            sub = PushSubscription.query.filter_by(
+                endpoint=subscription_dict.get('endpoint', '')).first()
+            if sub:
+                db.session.delete(sub)
+                db.session.commit()
+        return False
+    except Exception:
+        return False
+
+
+def notify_user(user_id, title, body, url='/'):
+    """Push to all devices of a single user."""
+    subs = PushSubscription.query.filter_by(user_id=user_id).all()
+    for sub in subs:
+        _send_push(sub.to_dict(), title, body, url)
+
+
+def notify_all_members(title, body, url='/'):
+    """Push to all active members (not admins)."""
+    members = User.query.filter_by(is_active_member=True, role='member').all()
+    for member in members:
+        notify_user(member.id, title, body, url)
+
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'rotaract-palghar-secret-2024')
@@ -31,9 +129,13 @@ if _db_url.startswith('postgres://'):
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'static', 'uploads', 'avatars')
-app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 MB max upload
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024  # 10 MB max upload
+BASE_DIR = os.path.dirname(__file__)
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+MINUTES_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'}
+DOCUMENT_EXTENSIONS = {'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+                        'txt', 'csv', 'png', 'jpg', 'jpeg', 'gif', 'zip', 'rar'}
 
 db.init_app(app)
 
@@ -146,6 +248,7 @@ def dashboard():
         calendar_events=calendar_events,
         cal_connected=cal_connected,
         my_absence_requests=my_absence_requests,
+        today_date=date.today(),
     )
 
 
@@ -178,12 +281,15 @@ def upload_profile_picture():
         flash('Invalid file type. Allowed: PNG, JPG, GIF, WEBP.', 'error')
         return redirect(url_for('profile'))
 
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    ext = file.filename.rsplit('.', 1)[1].lower()
-    filename = f"user_{current_user.id}.{ext}"
-    file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    url = upload_to_cloudinary(
+        file, folder='rotaract/avatars',
+        public_id=f'user_{current_user.id}', resource_type='image'
+    )
+    if not url:
+        flash('Upload failed. Please try again.', 'error')
+        return redirect(url_for('profile'))
 
-    current_user.profile_picture = filename
+    current_user.profile_picture = url
     db.session.commit()
     flash('Profile picture updated!', 'success')
     return redirect(url_for('profile'))
@@ -193,9 +299,7 @@ def upload_profile_picture():
 @login_required
 def remove_profile_picture():
     if current_user.profile_picture:
-        path = os.path.join(app.config['UPLOAD_FOLDER'], current_user.profile_picture)
-        if os.path.exists(path):
-            os.remove(path)
+        delete_from_cloudinary(f'rotaract/avatars/user_{current_user.id}', resource_type='image')
         current_user.profile_picture = None
         db.session.commit()
     flash('Profile picture removed.', 'success')
@@ -321,6 +425,11 @@ def admin_dashboard():
         Event.date >= datetime.utcnow()
     ).order_by(Event.date).limit(5).all()
     cal_connected = is_calendar_connected()
+    all_members = User.query.filter_by(is_active_member=True, role='member').all()
+    fees_paid_count = sum(1 for m in all_members if m.fees_status == 'paid')
+    fees_partial_count = sum(1 for m in all_members if m.fees_status == 'partial')
+    fees_unpaid_count = sum(1 for m in all_members if m.fees_status == 'unpaid')
+    fees_paid_total = sum(m.fees_paid_amount for m in all_members if m.fees_status in ('paid', 'partial'))
     return render_template(
         'admin/dashboard.html',
         leaderboard=leaderboard,
@@ -331,6 +440,10 @@ def admin_dashboard():
         recent_entries=recent_entries,
         upcoming_events=upcoming_events,
         cal_connected=cal_connected,
+        fees_paid_count=fees_paid_count,
+        fees_partial_count=fees_partial_count,
+        fees_unpaid_count=fees_unpaid_count,
+        fees_paid_total=fees_paid_total,
     )
 
 
@@ -381,6 +494,27 @@ def admin_members_edit(member_id):
         user.set_password(new_password)
     db.session.commit()
     flash(f'Member {user.name} updated.', 'success')
+    return redirect(url_for('admin_members'))
+
+
+@app.route('/admin/members/<int:member_id>/fees', methods=['POST'])
+@login_required
+@admin_required
+def admin_members_fees(member_id):
+    user = User.query.get_or_404(member_id)
+    user.fees_status = request.form.get('fees_status', user.fees_status)
+    user.fees_amount = int(request.form.get('fees_amount') or 0)
+    user.fees_paid_amount = int(request.form.get('fees_paid_amount') or 0)
+    paid_date_str = request.form.get('fees_paid_date', '')
+    if paid_date_str:
+        try:
+            user.fees_paid_date = datetime.strptime(paid_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+    else:
+        user.fees_paid_date = None
+    db.session.commit()
+    flash(f'Fees updated for {user.name}.', 'success')
     return redirect(url_for('admin_members'))
 
 
@@ -481,6 +615,13 @@ def admin_points_add():
     db.session.add(entry)
     db.session.commit()
     member = User.query.get(member_id)
+    metric = Metric.query.get(metric_id)
+    notify_user(
+        member_id,
+        f'{"+" if points >= 0 else ""}{points} pts — {metric.name if metric else ""}',
+        note or 'Points updated by admin.',
+        '/dashboard',
+    )
     flash(f'{"+" if points >= 0 else ""}{points} points assigned to {member.name}.', 'success')
     return redirect(url_for('admin_points'))
 
@@ -539,6 +680,11 @@ def admin_events_add():
     if gcal_id:
         event.google_calendar_id = gcal_id
     db.session.commit()
+    notify_all_members(
+        f'New Event: {title}',
+        f'{event.date.strftime("%d %b")} · {event.location or "TBD"}',
+        '/dashboard',
+    )
     flash(f'Event "{title}" created.', 'success')
     return redirect(url_for('admin_events'))
 
@@ -574,6 +720,7 @@ def admin_event_detail(event_id):
         absence_requests=absence_requests,
         absence_member_ids=absence_member_ids,
         attendance_metric=attendance_metric,
+        today=date.today(),
     )
 
 
@@ -607,6 +754,14 @@ def admin_bulk_attendance(event_id):
                 ))
 
     db.session.commit()
+    if attendance_metric and event.points_for_attendance > 0:
+        for mid in member_ids:
+            notify_user(
+                mid,
+                f'+{event.points_for_attendance} pts — {event.title}',
+                'Your attendance has been marked and points awarded.',
+                '/dashboard',
+            )
     flash(
         f'Attendance saved: {len(member_ids)} present. '
         f'{"+" + str(event.points_for_attendance) + " pts each awarded." if attendance_metric else "No attendance metric found — create one to auto-award points."}',
@@ -640,6 +795,12 @@ def approve_absence(req_id):
     req.reviewed_by_id = current_user.id
     req.reviewed_at = datetime.utcnow()
     db.session.commit()
+    notify_user(
+        req.member_id,
+        'Absence Approved ✓',
+        f'Your absence for "{req.event.title}" has been approved.',
+        '/absence',
+    )
     flash(f'Absence approved for {req.member.name}.', 'success')
     return redirect(url_for('admin_absence_requests'))
 
@@ -654,6 +815,12 @@ def reject_absence(req_id):
     req.reviewed_by_id = current_user.id
     req.reviewed_at = datetime.utcnow()
     db.session.commit()
+    notify_user(
+        req.member_id,
+        'Absence Request Update',
+        f'Your absence request for "{req.event.title}" was not approved.',
+        '/absence',
+    )
     flash(f'Absence request by {req.member.name} rejected.', 'success')
     return redirect(url_for('admin_absence_requests'))
 
@@ -684,6 +851,12 @@ def respond_dispute(dispute_id):
     dispute.resolved_by_id = current_user.id
     dispute.resolved_at = datetime.utcnow()
     db.session.commit()
+    notify_user(
+        dispute.member_id,
+        'Admin Replied to Your Complaint',
+        f'"{dispute.subject}" — admin has responded.',
+        '/disputes',
+    )
     flash(f'Response sent to {dispute.member.name}.', 'success')
     return redirect(url_for('admin_disputes'))
 
@@ -820,18 +993,365 @@ def api_comparison():
     })
 
 
+# ─── Member Events List ───────────────────────────────────────────────────────
+
+@app.route('/events')
+@login_required
+def events_list():
+    upcoming = Event.query.filter(Event.date >= datetime.utcnow()).order_by(Event.date).all()
+    past = Event.query.filter(Event.date < datetime.utcnow()).order_by(Event.date.desc()).limit(20).all()
+    today = date.today()
+    return render_template('member/events_list.html', upcoming=upcoming, past=past, today=today)
+
+
+# ─── Event Hub (chat, polls, minutes, days left) ─────────────────────────────
+
+@app.route('/events/<int:event_id>')
+@login_required
+def event_hub(event_id):
+    event = Event.query.get_or_404(event_id)
+    messages = EventMessage.query.filter_by(event_id=event_id).order_by(EventMessage.created_at).all()
+    polls = EventPoll.query.filter_by(event_id=event_id, is_active=True).order_by(EventPoll.created_at.desc()).all()
+    mins = EventMinutes.query.filter_by(event_id=event_id).order_by(EventMinutes.created_at.desc()).all()
+    my_absence = AbsenceRequest.query.filter_by(member_id=current_user.id, event_id=event_id).first()
+    today = date.today()
+    days_left = (event.date.date() - today).days
+    # Build per-poll vote context
+    poll_data = []
+    for poll in polls:
+        counts = poll.vote_counts()
+        total = poll.total_votes()
+        my_vote = poll.user_vote(current_user.id)
+        options_with_pct = [
+            {'label': opt, 'count': counts[i],
+             'pct': round(counts[i] / total * 100) if total else 0}
+            for i, opt in enumerate(poll.options)
+        ]
+        poll_data.append({'poll': poll, 'options': options_with_pct,
+                          'total': total, 'my_vote': my_vote})
+    return render_template('event.html', event=event, messages=messages,
+                           poll_data=poll_data, mins=mins,
+                           my_absence=my_absence, days_left=days_left, today=today)
+
+
+@app.route('/events/<int:event_id>/chat', methods=['POST'])
+@login_required
+def post_event_message(event_id):
+    Event.query.get_or_404(event_id)
+    msg_type = request.form.get('msg_type', 'text')
+
+    if msg_type == 'image':
+        file = request.files.get('image')
+        if not file or not file.filename or not allowed_file(file.filename):
+            flash('Please select a valid image (PNG/JPG/GIF/WEBP).', 'error')
+            return redirect(url_for('event_hub', event_id=event_id) + '#chat')
+        url = upload_to_cloudinary(file, folder='rotaract/event_chat', resource_type='image')
+        if not url:
+            flash('Image upload failed. Please try again.', 'error')
+            return redirect(url_for('event_hub', event_id=event_id) + '#chat')
+        caption = request.form.get('content', '').strip()
+        msg = EventMessage(event_id=event_id, user_id=current_user.id,
+                           content=caption, msg_type='image', image_path=url)
+
+    elif msg_type == 'location':
+        if current_user.role != 'admin':
+            flash('Only admin can pin locations.', 'error')
+            return redirect(url_for('event_hub', event_id=event_id) + '#chat')
+        loc_url = request.form.get('location_url', '').strip()
+        label = request.form.get('content', '').strip() or 'View Location'
+        if not loc_url:
+            flash('Location URL is required.', 'error')
+            return redirect(url_for('event_hub', event_id=event_id) + '#chat')
+        msg = EventMessage(event_id=event_id, user_id=current_user.id,
+                           content=loc_url, msg_type='location',
+                           image_path=label)  # reuse image_path for label
+
+    else:
+        content = request.form.get('content', '').strip()
+        if not content:
+            flash('Message cannot be empty.', 'error')
+            return redirect(url_for('event_hub', event_id=event_id) + '#chat')
+        msg = EventMessage(event_id=event_id, user_id=current_user.id,
+                           content=content, msg_type='text')
+
+    db.session.add(msg)
+    db.session.commit()
+    return redirect(url_for('event_hub', event_id=event_id) + '#chat-bottom')
+
+
+@app.route('/events/<int:event_id>/poll/<int:poll_id>/vote', methods=['POST'])
+@login_required
+def vote_poll(event_id, poll_id):
+    poll = EventPoll.query.get_or_404(poll_id)
+    option_index = request.form.get('option', type=int, default=-1)
+    if option_index < 0 or option_index >= len(poll.options):
+        flash('Invalid option.', 'error')
+        return redirect(url_for('event_hub', event_id=event_id) + '#polls')
+    existing = EventPollVote.query.filter_by(poll_id=poll_id, user_id=current_user.id).first()
+    if existing:
+        existing.option_index = option_index
+    else:
+        db.session.add(EventPollVote(poll_id=poll_id, user_id=current_user.id, option_index=option_index))
+    db.session.commit()
+    return redirect(url_for('event_hub', event_id=event_id) + '#polls')
+
+
+@app.route('/admin/events/<int:event_id>/poll', methods=['POST'])
+@login_required
+@admin_required
+def admin_create_poll(event_id):
+    Event.query.get_or_404(event_id)
+    question = request.form.get('question', '').strip()
+    options = [o.strip() for o in request.form.getlist('options') if o.strip()]
+    if not question or len(options) < 2:
+        flash('Need a question and at least 2 options.', 'error')
+        return redirect(url_for('event_hub', event_id=event_id) + '#polls')
+    poll = EventPoll(event_id=event_id, question=question,
+                     options_json=json.dumps(options), created_by_id=current_user.id)
+    db.session.add(poll)
+    db.session.commit()
+    notify_all_members(
+        f'New Poll: {question[:60]}',
+        f'Vote on the poll for "{Event.query.get(event_id).title}"',
+        f'/events/{event_id}#polls',
+    )
+    flash('Poll created.', 'success')
+    return redirect(url_for('event_hub', event_id=event_id) + '#polls')
+
+
+@app.route('/admin/events/<int:event_id>/minutes', methods=['POST'])
+@login_required
+@admin_required
+def admin_add_minutes(event_id):
+    Event.query.get_or_404(event_id)
+    title = request.form.get('title', '').strip()
+    content = request.form.get('content', '').strip() or None
+    if not title:
+        flash('Title is required.', 'error')
+        return redirect(url_for('event_hub', event_id=event_id) + '#minutes')
+
+    minutes = EventMinutes(event_id=event_id, title=title, content=content,
+                           created_by_id=current_user.id)
+    file = request.files.get('file')
+    if file and file.filename:
+        ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+        if ext not in MINUTES_EXTENSIONS:
+            flash('Invalid file type. Allowed: PDF, Word, Excel, PPT, TXT.', 'error')
+            return redirect(url_for('event_hub', event_id=event_id) + '#minutes')
+        url = upload_to_cloudinary(file, folder='rotaract/minutes', resource_type='auto')
+        if not url:
+            flash('File upload failed. Please try again.', 'error')
+            return redirect(url_for('event_hub', event_id=event_id) + '#minutes')
+        minutes.file_path = url
+        minutes.file_original_name = file.filename
+
+    if not content and not (file and file.filename):
+        flash('Add text content or upload a file.', 'error')
+        return redirect(url_for('event_hub', event_id=event_id) + '#minutes')
+
+    db.session.add(minutes)
+    db.session.commit()
+    flash('Minutes/report added.', 'success')
+    return redirect(url_for('event_hub', event_id=event_id) + '#minutes')
+
+
+@app.route('/admin/events/<int:event_id>/minutes/<int:minutes_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def admin_delete_minutes(event_id, minutes_id):
+    m = EventMinutes.query.get_or_404(minutes_id)
+    db.session.delete(m)
+    db.session.commit()
+    flash('Deleted.', 'success')
+    return redirect(url_for('event_hub', event_id=event_id) + '#minutes')
+
+
+@app.route('/admin/events/<int:event_id>/poll/<int:poll_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def admin_delete_poll(event_id, poll_id):
+    poll = EventPoll.query.get_or_404(poll_id)
+    db.session.delete(poll)
+    db.session.commit()
+    flash('Poll deleted.', 'success')
+    return redirect(url_for('event_hub', event_id=event_id) + '#polls')
+
+
+# ─── Push Notification API ───────────────────────────────────────────────────
+
+@app.route('/api/push/vapid-public-key')
+@login_required
+def api_push_vapid_key():
+    return jsonify({'publicKey': VAPID_PUBLIC_KEY})
+
+
+@app.route('/api/push/subscribe', methods=['POST'])
+@login_required
+def api_push_subscribe():
+    data = request.get_json(silent=True) or {}
+    endpoint = data.get('endpoint', '')
+    keys = data.get('keys', {})
+    if not endpoint or not keys.get('p256dh') or not keys.get('auth'):
+        return jsonify({'error': 'Invalid subscription data'}), 400
+    # Upsert: update if endpoint already exists
+    sub = PushSubscription.query.filter_by(endpoint=endpoint).first()
+    if sub:
+        sub.user_id = current_user.id
+        sub.p256dh = keys['p256dh']
+        sub.auth = keys['auth']
+    else:
+        sub = PushSubscription(
+            user_id=current_user.id,
+            endpoint=endpoint,
+            p256dh=keys['p256dh'],
+            auth=keys['auth'],
+        )
+        db.session.add(sub)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+
+@app.route('/api/push/unsubscribe', methods=['POST'])
+@login_required
+def api_push_unsubscribe():
+    data = request.get_json(silent=True) or {}
+    endpoint = data.get('endpoint', '')
+    sub = PushSubscription.query.filter_by(endpoint=endpoint, user_id=current_user.id).first()
+    if sub:
+        db.session.delete(sub)
+        db.session.commit()
+    return jsonify({'ok': True})
+
+
+# ─── Club Documents ──────────────────────────────────────────────────────────
+
+DOCS_UPLOAD_DIR = os.path.join(BASE_DIR, 'static', 'uploads', 'documents')
+
+
+@app.route('/documents')
+@login_required
+def documents():
+    folders = DocumentFolder.query.order_by(DocumentFolder.created_at).all()
+    return render_template('documents.html', folders=folders)
+
+
+@app.route('/admin/documents/folder', methods=['POST'])
+@login_required
+@admin_required
+def admin_documents_create_folder():
+    name = request.form.get('name', '').strip()
+    description = request.form.get('description', '').strip()
+    if not name:
+        flash('Folder name is required.', 'error')
+        return redirect(url_for('documents'))
+    folder = DocumentFolder(name=name, description=description or None,
+                            created_by_id=current_user.id)
+    db.session.add(folder)
+    db.session.commit()
+    flash(f'Folder "{name}" created.', 'success')
+    return redirect(url_for('documents'))
+
+
+@app.route('/admin/documents/folder/<int:folder_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def admin_documents_delete_folder(folder_id):
+    folder = DocumentFolder.query.get_or_404(folder_id)
+    # Files are stored on Cloudinary — no local deletion needed
+    for doc in folder.documents.all():
+        try:
+            pass  # Cloudinary cleanup can be added here if needed
+        except Exception:
+            pass
+    db.session.delete(folder)
+    db.session.commit()
+    flash(f'Folder "{folder.name}" deleted.', 'success')
+    return redirect(url_for('documents'))
+
+
+@app.route('/admin/documents/upload', methods=['POST'])
+@login_required
+@admin_required
+def admin_documents_upload():
+    folder_id = request.form.get('folder_id', type=int)
+    title = request.form.get('title', '').strip()
+    file = request.files.get('file')
+    if not folder_id or not file or not file.filename:
+        flash('Folder and file are required.', 'error')
+        return redirect(url_for('documents'))
+    folder = DocumentFolder.query.get_or_404(folder_id)
+    ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+    if ext not in DOCUMENT_EXTENSIONS:
+        flash('File type not allowed.', 'error')
+        return redirect(url_for('documents'))
+    safe_name = secure_filename(file.filename)
+    url = upload_to_cloudinary(file, folder='rotaract/documents', resource_type='auto')
+    if not url:
+        flash('File upload failed. Please try again.', 'error')
+        return redirect(url_for('documents'))
+    doc = ClubDocument(
+        folder_id=folder.id,
+        title=title or safe_name,
+        file_path=url,
+        file_original_name=safe_name,
+        uploaded_by_id=current_user.id,
+    )
+    db.session.add(doc)
+    db.session.commit()
+    flash(f'"{doc.title}" uploaded to {folder.name}.', 'success')
+    return redirect(url_for('documents'))
+
+
+@app.route('/admin/documents/<int:doc_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def admin_documents_delete(doc_id):
+    doc = ClubDocument.query.get_or_404(doc_id)
+    db.session.delete(doc)
+    db.session.commit()
+    flash(f'"{doc.title}" deleted.', 'success')
+    return redirect(url_for('documents'))
+
+
+@app.route('/documents/download/<int:doc_id>')
+@login_required
+def documents_download(doc_id):
+    doc = ClubDocument.query.get_or_404(doc_id)
+    return redirect(doc.file_path)
+
+
 # ─── DB Init & Seed ──────────────────────────────────────────────────────────
 
 def migrate_schema():
     """Add new columns to existing tables without dropping data."""
     from sqlalchemy import text, inspect
     inspector = inspect(db.engine)
+    existing_tables = inspector.get_table_names()
     with db.engine.connect() as conn:
-        user_cols = [c['name'] for c in inspector.get_columns('user')]
+        user_cols = [c['name'] for c in inspector.get_columns('user')] if 'user' in existing_tables else []
         if 'profile_picture' not in user_cols:
             conn.execute(text('ALTER TABLE user ADD COLUMN profile_picture VARCHAR(200)'))
             conn.commit()
             print('  ✔ Added profile_picture column')
+        if 'fees_status' not in user_cols:
+            conn.execute(text("ALTER TABLE user ADD COLUMN fees_status VARCHAR(20) DEFAULT 'unpaid'"))
+            conn.commit()
+            print('  ✔ Added fees_status column')
+        if 'fees_amount' not in user_cols:
+            conn.execute(text('ALTER TABLE user ADD COLUMN fees_amount INTEGER DEFAULT 0'))
+            conn.commit()
+            print('  ✔ Added fees_amount column')
+        if 'fees_paid_amount' not in user_cols:
+            conn.execute(text('ALTER TABLE user ADD COLUMN fees_paid_amount INTEGER DEFAULT 0'))
+            conn.commit()
+            print('  ✔ Added fees_paid_amount column')
+        if 'fees_paid_date' not in user_cols:
+            conn.execute(text('ALTER TABLE user ADD COLUMN fees_paid_date DATE'))
+            conn.commit()
+            print('  ✔ Added fees_paid_date column')
+    # Create any missing tables (push_subscription, event_message, event_poll, etc.)
+    db.create_all()
+    print('  ✔ Ensured all tables exist')
 
 
 def seed_database():

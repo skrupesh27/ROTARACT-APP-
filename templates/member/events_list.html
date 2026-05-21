@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Events — Rotaract{% endblock %}
+{% block page_title %}Events{% endblock %}
+
+{% block head %}
+<style>
+  .events-grid { display:flex;flex-direction:column;gap:0.65rem; }
+  .event-card {
+    display:flex;align-items:center;gap:1rem;
+    background:var(--card);border:1px solid var(--border);border-radius:12px;
+    padding:1rem 1.25rem;text-decoration:none;color:inherit;
+    transition:border-color 0.15s,background 0.15s;
+  }
+  .event-card:hover { border-color:var(--blue);background:rgba(0,114,206,0.04); }
+  .ev-type-dot { width:12px;height:12px;border-radius:50%;flex-shrink:0; }
+  .ev-info { flex:1;min-width:0; }
+  .ev-title { font-size:0.95rem;font-weight:600;margin-bottom:0.2rem; }
+  .ev-meta { font-size:0.78rem;color:var(--muted); }
+  .ev-badge { padding:0.15rem 0.55rem;border-radius:6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;flex-shrink:0; }
+  .ev-pts { font-size:0.8rem;font-weight:700;color:var(--gold);flex-shrink:0; }
+  .days-chip { font-size:0.7rem;font-weight:700;padding:0.2rem 0.55rem;border-radius:6px;flex-shrink:0; }
+  .section-lbl { font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin:1.5rem 0 0.75rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="section-lbl">Upcoming</div>
+{% if upcoming %}
+<div class="events-grid">
+  {% for event in upcoming %}
+  {% set days_left = (event.date.date() - today).days %}
+  <a href="/events/{{ event.id }}" class="event-card">
+    <div class="ev-type-dot" style="background:{{ event.type_color }};"></div>
+    <div class="ev-info">
+      <div class="ev-title">{{ event.title }}</div>
+      <div class="ev-meta">
+        {{ event.date.strftime('%A, %d %b %Y · %I:%M %p') }}
+        {% if event.location %} · 📍 {{ event.location }}{% endif %}
+      </div>
+    </div>
+    <span class="ev-badge" style="background:{{ event.type_color }}22;color:{{ event.type_color }};">{{ event.event_type | capitalize }}</span>
+    {% if event.points_for_attendance > 0 %}<span class="ev-pts">+{{ event.points_for_attendance }}pts</span>{% endif %}
+    {% if days_left == 0 %}
+    <span class="days-chip" style="background:rgba(247,168,27,0.12);color:var(--gold);">Today!</span>
+    {% elif days_left == 1 %}
+    <span class="days-chip" style="background:rgba(0,114,206,0.1);color:var(--blue);">1 day</span>
+    {% else %}
+    <span class="days-chip" style="background:rgba(0,114,206,0.08);color:var(--blue);">{{ days_left }} days</span>
+    {% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p style="color:var(--muted);font-size:0.85rem;">No upcoming events scheduled.</p>
+{% endif %}
+
+{% if past %}
+<div class="section-lbl">Past Events</div>
+<div class="events-grid">
+  {% for event in past %}
+  <a href="/events/{{ event.id }}" class="event-card" style="opacity:0.7;">
+    <div class="ev-type-dot" style="background:{{ event.type_color }};"></div>
+    <div class="ev-info">
+      <div class="ev-title">{{ event.title }}</div>
+      <div class="ev-meta">{{ event.date.strftime('%d %b %Y') }}{% if event.location %} · {{ event.location }}{% endif %}</div>
+    </div>
+    <span class="ev-badge" style="background:{{ event.type_color }}22;color:{{ event.type_color }};">{{ event.event_type | capitalize }}</span>
+    <span class="days-chip" style="background:rgba(255,255,255,0.04);color:var(--muted);">Done</span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

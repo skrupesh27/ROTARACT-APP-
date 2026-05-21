@@ -59,7 +59,7 @@
       <div class="d-header">
         <div class="d-av" style="background: hsl({{ loop.index * 45 }}, 55%, 30%);">
           {% if d.member.profile_picture %}
-            <img src="/static/uploads/avatars/{{ d.member.profile_picture }}" alt="{{ d.member.initials }}" />
+            <img src="{{ d.member.profile_picture }}" alt="{{ d.member.initials }}" />
           {% else %}
             {{ d.member.initials }}
           {% endif %}
@@ -108,7 +108,7 @@
       <div class="d-header">
         <div class="d-av" style="background: hsl({{ loop.index * 55 }}, 50%, 30%);">
           {% if d.member.profile_picture %}
-            <img src="/static/uploads/avatars/{{ d.member.profile_picture }}" alt="{{ d.member.initials }}" />
+            <img src="{{ d.member.profile_picture }}" alt="{{ d.member.initials }}" />
           {% else %}
             {{ d.member.initials }}
           {% endif %}

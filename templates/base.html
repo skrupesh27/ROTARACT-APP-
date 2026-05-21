@@ -4,6 +4,15 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}Rotaract Club of Palghar{% endblock %}</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="/static/manifest.json" />
+  <meta name="theme-color" content="#0072CE" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Rotaract" />
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -304,6 +313,12 @@
       <a href="/dashboard" class="nav-link {% if request.path == '/dashboard' %}active{% endif %}">
         <span class="icon">📊</span> Dashboard
       </a>
+      <a href="/events" class="nav-link {% if request.path.startswith('/events') %}active{% endif %}">
+        <span class="icon">📅</span> Events
+      </a>
+      <a href="/documents" class="nav-link {% if request.path.startswith('/documents') %}active{% endif %}">
+        <span class="icon">📁</span> Club Documents
+      </a>
       <a href="/absence" class="nav-link {% if request.path.startswith('/absence') %}active{% endif %}">
         <span class="icon">🙋</span> Absence Requests
         {% if pending_absence_count and current_user.role != 'admin' %}
@@ -356,7 +371,7 @@
       <a href="/profile" class="user-card">
         <div class="avatar">
           {% if current_user.profile_picture %}
-            <img src="/static/uploads/avatars/{{ current_user.profile_picture }}" alt="avatar" />
+            <img src="{{ current_user.profile_picture }}" alt="avatar" />
           {% else %}
             {{ current_user.initials }}
           {% endif %}
@@ -395,5 +410,114 @@
       {% block content %}{% endblock %}
     </main>
   </div>
+  <!-- Push Notification Prompt Banner -->
+  <div id="push-banner" style="display:none; position:fixed; bottom:1rem; right:1rem; z-index:999;
+    background:#0d0d28; border:1px solid #1a1a40; border-radius:12px; padding:1rem 1.25rem;
+    max-width:320px; box-shadow:0 8px 32px rgba(0,0,0,0.5);">
+    <div style="font-size:0.9rem; font-weight:600; margin-bottom:0.35rem;">🔔 Enable Notifications</div>
+    <div style="font-size:0.78rem; color:#6b7a99; margin-bottom:0.85rem;">
+      Get instant alerts for events, points, and admin replies.
+    </div>
+    <div style="display:flex; gap:0.5rem;">
+      <button onclick="subscribePush()" style="flex:1; padding:0.45rem 0.75rem; background:#0072CE;
+        color:#fff; border:none; border-radius:7px; font-size:0.8rem; font-weight:600; cursor:pointer;">
+        Enable
+      </button>
+      <button onclick="dismissPushBanner()" style="padding:0.45rem 0.75rem; background:transparent;
+        border:1px solid #1a1a40; color:#6b7a99; border-radius:7px; font-size:0.8rem; cursor:pointer;">
+        Later
+      </button>
+    </div>
+  </div>
+
+  <script>
+  // ── Service Worker registration ───────────────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+    });
+  }
+
+  // ── Push Notification logic ───────────────────────────────────────────────
+  const PUSH_BANNER_DISMISSED_KEY = 'push_banner_dismissed';
+
+  function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = atob(base64);
+    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+  }
+
+  async function getVapidKey() {
+    try {
+      const r = await fetch('/api/push/vapid-public-key');
+      const d = await r.json();
+      return d.publicKey || '';
+    } catch { return ''; }
+  }
+
+  async function subscribePush() {
+    document.getElementById('push-banner').style.display = 'none';
+    if (!('PushManager' in window)) return;
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') return;
+      const vapidKey = await getVapidKey();
+      if (!vapidKey) return;
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      });
+      await fetch('/api/push/subscribe', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(sub.toJSON()),
+      });
+      localStorage.setItem('push_subscribed', '1');
+    } catch (e) { console.warn('Push subscribe failed:', e); }
+  }
+
+  async function unsubscribePush() {
+    if (!('serviceWorker' in navigator)) return;
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      await fetch('/api/push/unsubscribe', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({endpoint: sub.endpoint}),
+      });
+      await sub.unsubscribe();
+      localStorage.removeItem('push_subscribed');
+    }
+  }
+
+  function dismissPushBanner() {
+    document.getElementById('push-banner').style.display = 'none';
+    sessionStorage.setItem(PUSH_BANNER_DISMISSED_KEY, '1');
+  }
+
+  // Show banner if: push supported, not already subscribed/dismissed
+  async function maybeShowPushBanner() {
+    if (!('PushManager' in window) || !('Notification' in window)) return;
+    if (Notification.permission === 'denied') return;
+    if (localStorage.getItem('push_subscribed')) return;
+    if (sessionStorage.getItem(PUSH_BANNER_DISMISSED_KEY)) return;
+    // Check if already subscribed in browser
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.ready.catch(() => null);
+      if (reg) {
+        const sub = await reg.pushManager.getSubscription();
+        if (sub) { localStorage.setItem('push_subscribed', '1'); return; }
+      }
+    }
+    setTimeout(() => {
+      document.getElementById('push-banner').style.display = 'block';
+    }, 3000);
+  }
+
+  maybeShowPushBanner();
+  </script>
 </body>
 </html>
