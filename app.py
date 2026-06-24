@@ -1426,12 +1426,13 @@ def seed_database():
     print('Member: aarav@example.com / member123')
 
 
+with app.app_context():
+    db.create_all()
+    try:
+        migrate_schema()
+    except Exception:
+        pass
+    seed_database()
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-        try:
-            migrate_schema()
-        except Exception:
-            pass  # columns already exist
-        seed_database()
     app.run(debug=True, port=8082)
