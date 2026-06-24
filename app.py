@@ -24,7 +24,12 @@ from models import (db, User, Metric, PointEntry, Event, EventAttendance,
                     AbsenceRequest, PointDispute, PushSubscription,
                     EventMessage, EventPoll, EventPollVote, EventMinutes,
                     DocumentFolder, ClubDocument)
-from google_calendar import get_upcoming_events, sync_event_to_calendar, is_calendar_connected
+try:
+    from google_calendar import get_upcoming_events, sync_event_to_calendar, is_calendar_connected
+except Exception:
+    def get_upcoming_events(*a, **k): return []
+    def sync_event_to_calendar(*a, **k): return None
+    def is_calendar_connected(*a, **k): return False
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
