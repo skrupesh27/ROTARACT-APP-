@@ -1367,6 +1367,23 @@ def seed_database():
                  role='admin', position='President')
     admin.set_password('admin123')
     db.session.add(admin)
+
+    metrics_data = [
+        ('Event Attendance',              'Points for attending club meetings, events, and activities',                          '📅', '#0072CE', 200),
+        ('Community Service',             'Points for volunteer hours in local community service projects',                      '🤝', '#10b981', 200),
+        ('Project Leadership / Chairmanship', 'Points for leading, co-leading, or chairing projects, meetings, or events',      '🚀', '#F7A81B', 200),
+        ('International / Global Service','Points for participation in global causes, international projects, or Rotary Foundation support', '🌍', '#6366f1', 200),
+        ('Fundraising',                   'Points for contributions to fundraising and funds raised for service',                '💰', '#8b5cf6', 200),
+        ('Training & Leadership Development', 'Points for attending trainings, workshops, district/zone/RYLA events',           '📚', '#ef4444', 200),
+        ('Social Media & Visibility',     'Points for club social media participation, content creation, and promotion',        '📱', '#f59e0b', 200),
+        ('Membership Recruitment',        'Points for bringing in and helping onboard new members',                             '👥', '#06b6d4', 200),
+        ('Professional Development',      'Points for organizing or participating in skill-building / career sessions',         '💼', '#84cc16', 200),
+        ('Rotary Collaboration',          'Points for joint projects, meetings, or activities with sponsor Rotary Club or other clubs', '🔗', '#ec4899', 200),
+        ('Club Administration & Support', 'Points for helping with reporting, secretary/treasurer tasks, or club operations',   '🗂️', '#14b8a6', 200),
+    ]
+    for name, desc, icon, color, max_pts in metrics_data:
+        db.session.add(Metric(name=name, description=desc, icon=icon, color=color, max_points=max_pts))
+
     db.session.commit()
     print('Admin account created: admin@rotaract-palghar.org / admin123')
 
