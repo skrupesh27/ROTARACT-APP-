@@ -1362,73 +1362,13 @@ def migrate_schema():
 def seed_database():
     if User.query.first():
         return
-    print('Seeding database with sample data...')
-    admin = User(name='Rtn. President', email='admin@rotaract-palghar.org',
+    print('Creating admin account...')
+    admin = User(name='Admin', email='admin@rotaract-palghar.org',
                  role='admin', position='President')
     admin.set_password('admin123')
     db.session.add(admin)
-    members_data = [
-        ('Aarav Shah', 'aarav@example.com', 'Vice President'),
-        ('Priya Mehta', 'priya@example.com', 'Secretary'),
-        ('Rohan Desai', 'rohan@example.com', 'Treasurer'),
-        ('Sneha Patil', 'sneha@example.com', 'Director - Community Service'),
-        ('Karan Joshi', 'karan@example.com', 'Director - Projects'),
-        ('Neha Sharma', 'neha@example.com', 'Sergeant at Arms'),
-        ('Vikram Nair', 'vikram@example.com', 'Member'),
-        ('Ananya Iyer', 'ananya@example.com', 'Member'),
-        ('Rahul Gupta', 'rahul@example.com', 'Member'),
-        ('Pooja Singh', 'pooja@example.com', 'Member'),
-    ]
-    members = []
-    for name, email, position in members_data:
-        u = User(name=name, email=email, position=position)
-        u.set_password('member123')
-        db.session.add(u)
-        members.append(u)
-    metrics_data = [
-        ('Event Attendance', 'Points for attending club meetings and events', '📅', '#0072CE'),
-        ('Community Service', 'Points for community service hours', '🤝', '#10b981'),
-        ('Project Leadership', 'Points for leading or co-leading projects', '🚀', '#F7A81B'),
-        ('Fundraising', 'Points for fundraising contributions', '💰', '#8b5cf6'),
-        ('Training & Development', 'Points for attending district/zone training', '📚', '#ef4444'),
-        ('Social Media Engagement', 'Points for club social media participation', '📱', '#f59e0b'),
-        ('Membership Recruitment', 'Points for bringing new members', '👥', '#06b6d4'),
-    ]
-    metrics = []
-    for name, desc, icon, color in metrics_data:
-        m = Metric(name=name, description=desc, icon=icon, color=color, max_points=200)
-        db.session.add(m)
-        metrics.append(m)
-    db.session.flush()
-    now = datetime.utcnow()
-    events_data = [
-        ('Weekly Assembly Meeting', 'meeting', now + timedelta(days=3), 'Club House, Palghar', 10),
-        ('Blood Donation Drive', 'project', now + timedelta(days=7), 'Palghar Civil Hospital', 50),
-        ('District Assembly', 'event', now + timedelta(days=14), 'Thane', 30),
-        ('Annual Gala Night', 'social', now + timedelta(days=21), 'Hotel Grand, Palghar', 20),
-        ('Tree Plantation Drive', 'project', now + timedelta(days=10), 'Palghar Beach', 40),
-    ]
-    for title, etype, edate, location, pts in events_data:
-        db.session.add(Event(title=title, event_type=etype, date=edate,
-                             location=location, points_for_attendance=pts))
-    db.session.flush()
-    import random
-    random.seed(42)
-    today = date.today()
-    for member in members:
-        for _ in range(random.randint(5, 15)):
-            metric = random.choice(metrics)
-            pts = random.choice([10, 15, 20, 25, 30, 40, 50, -10])
-            entry = PointEntry(
-                member_id=member.id, metric_id=metric.id, points=pts,
-                note=f'Sample entry for {metric.name}',
-                date=today - timedelta(days=random.randint(0, 90)),
-                added_by_id=admin.id,
-            )
-            db.session.add(entry)
     db.session.commit()
-    print('Database seeded. Admin: admin@rotaract-palghar.org / admin123')
-    print('Member: aarav@example.com / member123')
+    print('Admin account created: admin@rotaract-palghar.org / admin123')
 
 
 with app.app_context():
