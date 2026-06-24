@@ -1426,12 +1426,28 @@ def seed_database():
     print('Member: aarav@example.com / member123')
 
 
+# ─── Startup initialisation (runs at import time, before gunicorn serves) ────
+# db.create_all() is idempotent — safe to call on every deploy/restart.
+with app.app_context():
+    db.create_all()
+    try:
+        migrate_schema()
+    except Exception as _e:
+        print(f'migrate_schema skipped: {_e}')
+    if not User.query.first():
+        _admin = User(
+            name='Admin',
+            email='admin@rotaract-palghar.org',
+            role='admin',
+            position='President',
+        )
+        _admin.set_password('admin123')
+        db.session.add(_admin)
+        db.session.commit()
+        print('Default admin created: admin@rotaract-palghar.org / admin123')
+
+
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()
-        try:
-            migrate_schema()
-        except Exception:
-            pass  # columns already exist
         seed_database()
     app.run(debug=True, port=8082)
