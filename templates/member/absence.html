@@ -5,6 +5,11 @@
 {% block head %}
 <style>
   .page-layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.25rem; align-items: start; }
+  @media (max-width: 900px) {
+    .page-layout { grid-template-columns: 1fr; }
+    .request-form-panel { position: static; }
+    .event-card { grid-template-columns: 1fr; }
+  }
   .event-list { display: flex; flex-direction: column; gap: 0.75rem; }
 
   .event-card {

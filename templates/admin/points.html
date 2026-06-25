@@ -6,6 +6,11 @@
 <style>
   .points-layout { display: grid; grid-template-columns: 360px 1fr; gap: 1.25rem; align-items: start; }
   .assign-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; position: sticky; top: 70px; }
+  .entries-panel { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  @media (max-width: 900px) {
+    .points-layout { grid-template-columns: 1fr; }
+    .assign-panel { position: static; }
+  }
   .assign-panel h3 { font-size: 1rem; font-weight: 700; margin-bottom: 1.25rem; }
 
   .pts-input-wrap { position: relative; }

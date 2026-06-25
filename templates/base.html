@@ -287,20 +287,76 @@
     .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
     .section-head h2 { font-size: 1rem; font-weight: 700; }
 
+    /* ── Hamburger button (mobile only) ── */
+    .hamburger {
+      display: none;
+      background: none; border: none; cursor: pointer;
+      padding: 0.4rem; color: var(--text); font-size: 1.4rem; line-height: 1;
+    }
+    /* ── Sidebar overlay (mobile) ── */
+    .sidebar-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6); z-index: 99;
+    }
+    .sidebar-overlay.open { display: block; }
+
+    /* ── Responsive table wrapper ── */
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
     @media (max-width: 900px) {
       .grid-4 { grid-template-columns: repeat(2, 1fr); }
       .grid-3 { grid-template-columns: repeat(2, 1fr); }
     }
     @media (max-width: 600px) {
-      .sidebar { transform: translateX(-100%); transition: transform 0.3s; }
-      .sidebar.open { transform: none; }
+      /* Sidebar slides in as drawer */
+      .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.28s cubic-bezier(.4,0,.2,1);
+      }
+      .sidebar.open { transform: translateX(0); }
       .main { margin-left: 0; }
+
+      /* Topbar */
+      .topbar { padding: 0 1rem; }
+      .topbar-actions { gap: 0.5rem; }
+      .topbar-actions > span:last-child { display: none; } /* hide name, keep role badge */
+      .hamburger { display: flex; align-items: center; justify-content: center; }
+
+      /* Content padding */
+      .content { padding: 1rem; }
+      .flash-container { padding: 0 1rem; }
+
+      /* Grids */
       .grid-4, .grid-3, .grid-2, .grid-12 { grid-template-columns: 1fr; }
+
+      /* Forms */
+      .form-row { grid-template-columns: 1fr; }
+
+      /* Modals */
+      .modal { padding: 1.25rem; border-radius: 12px; }
+      .modal-overlay { padding: 0.75rem; align-items: flex-end; }
+      .modal { border-radius: 16px 16px 0 0; max-height: 92vh; }
+
+      /* Buttons */
+      .btn { padding: 0.6rem 0.9rem; min-height: 40px; }
+      .btn-sm { padding: 0.5rem 0.75rem; min-height: 36px; font-size: 0.8rem; }
+
+      /* Tables: full horizontal scroll */
+      .table-scroll { border-radius: 10px; }
+      td, th { padding: 0.6rem 0.75rem; font-size: 0.8rem; white-space: nowrap; }
+
+      /* Section head wraps on small screens */
+      .section-head { flex-wrap: wrap; gap: 0.5rem; }
+    }
+    @media (max-width: 400px) {
+      :root { --sidebar-w: 220px; }
+      .content { padding: 0.75rem; }
     }
   </style>
   {% block head %}{% endblock %}
 </head>
 <body>
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <div class="emblem">🔵</div>
@@ -387,7 +443,10 @@
 
   <div class="main">
     <header class="topbar">
-      <span class="topbar-title">{% block page_title %}Dashboard{% endblock %}</span>
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <button class="hamburger" id="hamburgerBtn" aria-label="Open menu">☰</button>
+        <span class="topbar-title">{% block page_title %}Dashboard{% endblock %}</span>
+      </div>
       <div class="topbar-actions">
         <span class="badge-pill {% if current_user.role == 'admin' %}badge-admin{% else %}badge-member{% endif %}">
           {{ current_user.role | capitalize }}
@@ -431,6 +490,27 @@
   </div>
 
   <script>
+  // ── Sidebar toggle ────────────────────────────────────────────────────────
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  const hamburger = document.getElementById('hamburgerBtn');
+
+  function openSidebar() {
+    sidebar.classList.add('open');
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+  if (hamburger) hamburger.addEventListener('click', openSidebar);
+  // Close sidebar when a nav link is tapped on mobile
+  sidebar.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', () => { if (window.innerWidth <= 600) closeSidebar(); });
+  });
+
   // ── Service Worker registration ───────────────────────────────────────────
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {

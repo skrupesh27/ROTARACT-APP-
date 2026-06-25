@@ -5,6 +5,12 @@
 {% block head %}
 <style>
   .events-layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.25rem; align-items: start; }
+  @media (max-width: 900px) {
+    .events-layout { grid-template-columns: 1fr; }
+    .add-panel { position: static; }
+    .event-card { grid-template-columns: 1fr; }
+    .ec-actions { flex-direction: row; align-items: center; }
+  }
 
   .event-card {
     background: var(--card); border: 1px solid var(--border); border-radius: 10px;

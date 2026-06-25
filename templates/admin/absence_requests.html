@@ -5,6 +5,7 @@
 {% block head %}
 <style>
   .page-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  @media (max-width: 900px) { .page-grid { grid-template-columns: 1fr; } }
   .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
   .panel-head { padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
   .panel-head h2 { font-size: 0.95rem; font-weight: 700; }

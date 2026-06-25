@@ -4,7 +4,7 @@
 
 {% block head %}
 <style>
-  .hero { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
+  .hero { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
   .hero-card {
     background: var(--card);
     border: 1px solid var(--border);
@@ -34,6 +34,14 @@
   .hero-card .accent-purple { color: var(--purple); }
 
   .main-grid { display: grid; grid-template-columns: 1fr 340px; gap: 1.25rem; }
+  @media (max-width: 900px) {
+    .hero { grid-template-columns: repeat(3, 1fr); }
+    .main-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 600px) {
+    .hero { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
+    .hero-card .val { font-size: 1.6rem; }
+  }
   .panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.25rem; }
   .panel-title { font-size: 0.82rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.4rem; }
 

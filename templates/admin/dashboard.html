@@ -5,6 +5,19 @@
 {% block head %}
 <style>
   .stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  @media (max-width: 900px) {
+    .stat-cards { grid-template-columns: repeat(2, 1fr); }
+    .charts-grid { grid-template-columns: 1fr; }
+    .charts-row { grid-template-columns: 1fr; }
+    .bottom-grid { grid-template-columns: 1fr; }
+    .lb-full-row { grid-template-columns: 28px 32px 1fr 70px; }
+    .lb-full-row > *:nth-child(5), .lb-full-row > *:nth-child(6) { display: none; }
+  }
+  @media (max-width: 600px) {
+    .stat-cards { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
+    .chart-wrap { height: 180px; }
+    .chart-wrap-sm { height: 150px; }
+  }
   .stat-card {
     background: var(--card);
     border: 1px solid var(--border);

@@ -5,6 +5,10 @@
 {% block head %}
 <style>
   .page-layout { display: grid; grid-template-columns: 1fr 360px; gap: 1.25rem; align-items: start; }
+  @media (max-width: 900px) {
+    .page-layout { grid-template-columns: 1fr; }
+    .form-panel { position: static; }
+  }
 
   .disputes-list { display: flex; flex-direction: column; gap: 0.75rem; }
   .dispute-card {

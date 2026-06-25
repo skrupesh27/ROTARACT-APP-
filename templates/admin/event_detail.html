@@ -26,6 +26,13 @@
   .stat-chip .sl { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.2rem; }
 
   .main-grid { display: grid; grid-template-columns: 1fr 320px; gap: 1.25rem; }
+  @media (max-width: 900px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .event-hero { grid-template-columns: 1fr; }
+    .stat-chips { flex-direction: row; flex-wrap: wrap; align-items: flex-start; }
+    .search-members { width: 100%; }
+    .controls { flex-direction: column; align-items: flex-start; width: 100%; }
+  }
 
   /* Bulk attendance */
   .attendance-panel { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
